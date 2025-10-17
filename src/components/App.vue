@@ -156,11 +156,12 @@ export default defineComponent({
     });
 
     // --- save state --- //
-    if (import.meta.env.VITE_ENABLE_REMOTE_SAVE && urlParams.save) {
-      const url = Array.isArray(urlParams.save)
-        ? urlParams.save[0]
-        : urlParams.save;
+    if (import.meta.env.VITE_ENABLE_REMOTE_SAVE === 'true' && import.meta.env.VITE_REMOTE_SAVE_URL) {
+      const saveUrl = import.meta.env.VITE_REMOTE_SAVE_URL || urlParams.save;
+      if (saveUrl) {
+        const url = Array.isArray(saveUrl) ? saveUrl[0] : saveUrl;
       useRemoteSaveStateStore().setSaveUrl(url);
+      }
     }
 
     // --- layout --- //

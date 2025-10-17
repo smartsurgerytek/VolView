@@ -9,6 +9,7 @@ import {
   convertSuccessResultToDataSelection,
   importDataSources,
 } from '@/src/io/import/importDataSources';
+import { loadFiles } from '@/src/actions/loadUserFiles';
 import { useDatasetStore } from '../datasets';
 import { useDICOMStore } from '../datasets-dicom';
 import { useMessageStore } from '../messages';
@@ -21,6 +22,7 @@ import {
   retrieveSeriesMetadata,
   parseUrl,
 } from '../../core/dicom-web-api';
+
 
 const DICOM_WEB_URL_PARAM = 'dicomweb';
 
@@ -260,6 +262,44 @@ export const useDicomWebStore = defineStore('dicom-web', () => {
         dicoms.volumeStudy[volumeKey] === studyID
       );
       
+      const studyHasSRorSEG = volumeKeys.some(volumeKey => {
+        const modality = dicoms.volumeInfo[volumeKey].Modality;
+        return modality === 'SR' || modality === 'SEG';
+      });
+
+      if (studyHasSRorSEG) {
+        try {
+          // TODO: fetch url should be configurable
+          const response = await fetch('http://localhost:4014/api/load', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ StudyInstanceUID: studyID }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          const zipFile = new File([blob], 'session.volview.zip', { type: 'application/zip' });
+
+          console.log('Received zip file from backend:', zipFile);
+
+          // handle the zip file
+          
+          await loadFiles([zipFile]);
+
+          return; // exit the function, no need to download volumes one by one
+
+        } catch (error) {
+          const messageStore = useMessageStore();
+          messageStore.addError('Failed to process DICOM SR/SEG files', error as Error);
+          console.error('Error fetching or processing zip file:', error);
+        }
+      }
+
       volumeKeys.forEach(volumeKey => downloadVolume(volumeKey));
     }
 

@@ -133,7 +133,7 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
     <control-button
       size="40"
       icon="mdi-content-save-all"
-      name="Save session"
+      name="Save"
       :loading="isSaving"
       @click="handleSave"
     />

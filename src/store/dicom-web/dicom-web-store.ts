@@ -253,6 +253,16 @@ export const useDicomWebStore = defineStore('dicom-web', () => {
       console.error(error);
     }
 
+    if (deepestLevel === 'studies') {
+      const studyID = Object.values(parsedURL.value).pop() as string;
+
+      const volumeKeys = Object.keys(dicoms.volumeInfo).filter(volumeKey =>
+        dicoms.volumeStudy[volumeKey] === studyID
+      );
+      
+      volumeKeys.forEach(volumeKey => downloadVolume(volumeKey));
+    }
+
     if (deepestLevel === 'series') {
       const seriesID = Object.values(parsedURL.value).pop() as string;
       downloadVolume(seriesID);

@@ -81,6 +81,7 @@ import {
   stripTokenFromUrl,
 } from '@/src/utils/token';
 import { defaultImageMetadata } from '@/src/core/progressiveImage';
+import { useDicomWebStore } from '../store/dicom-web/dicom-web-store';
 
 export default defineComponent({
   name: 'App',
@@ -99,6 +100,7 @@ export default defineComponent({
   setup() {
     const imageStore = useImageStore();
     const dicomStore = useDICOMStore();
+    const dicomWebStore = useDicomWebStore();
 
     useGlobalErrorHook();
     useKeyboardShortcuts();
@@ -140,11 +142,24 @@ export default defineComponent({
     const urlParams = vtkURLExtract.extractURLParameters() as UrlParams;
 
     onMounted(() => {
-      if (!urlParams.urls) {
-        return;
+      if (urlParams.urls) {
+        loadUrls(urlParams);
       }
 
-      loadUrls(urlParams);
+      else if (urlParams.StudyInstanceUIDs) {
+
+        const uids = urlParams.StudyInstanceUIDs;
+        const studyUID = Array.isArray(uids) ? uids[0] : uids;
+
+        if (studyUID) {
+          const { VITE_DICOM_WEB_URL } = import.meta.env;
+
+          const fullUrl = `${VITE_DICOM_WEB_URL}/studies/${studyUID}`;
+
+          dicomWebStore.host = fullUrl;
+          dicomWebStore.fetchDicomsOnce();
+        }
+      }
     });
 
     // --- remote server --- //
@@ -160,7 +175,7 @@ export default defineComponent({
       const saveUrl = import.meta.env.VITE_REMOTE_SAVE_URL || urlParams.save;
       if (saveUrl) {
         const url = Array.isArray(saveUrl) ? saveUrl[0] : saveUrl;
-      useRemoteSaveStateStore().setSaveUrl(url);
+        useRemoteSaveStateStore().setSaveUrl(url);
       }
     }
 

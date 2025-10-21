@@ -57,10 +57,17 @@ export default defineComponent({
       });
     });
 
-    const hideSampleData = computed(() => dataBrowserStore.hideSampleData);
+    const hideSampleData = computed(() => {
+      if (import.meta.env.VITE_HIDE_SAMPLE_DATA !== undefined) {
+
+        return import.meta.env.VITE_HIDE_SAMPLE_DATA === 'true';  
+      }
+
+      return dataBrowserStore.hideSampleData;  
+    });
+
     watch(hideSampleData, (hide) => {
       if (hide) {
-        // Remove from panels to avoid error in vuetify group.ts
         removeFromArray(panels.value, SAMPLE_DATA_KEY);
       }
     });

@@ -31,6 +31,13 @@ export default defineComponent({
     const dataBrowserStore = useDataBrowserStore();
     const datasetStore = useDatasetStore();
 
+    const hideDicomWeb = computed(() => {  
+      if (import.meta.env.VITE_HIDE_DICOM_WEB !== undefined) {
+        return import.meta.env.VITE_HIDE_DICOM_WEB;  
+      }  
+      return false;  
+    });
+
     // TODO show patient ID in parens if there is a name conflict
     const patients = computed(() =>
       Object.entries(dicomStore.patientInfo)
@@ -118,6 +125,7 @@ export default defineComponent({
       ANONYMOUS_DATA_KEY,
       DICOM_WEB_KEY,
       hideSampleData,
+      hideDicomWeb
     };
   },
 });
@@ -181,7 +189,7 @@ export default defineComponent({
           </v-expansion-panel-text>
         </v-expansion-panel>
 
-        <v-expansion-panel v-if="dicomWeb.isConfigured" :value="DICOM_WEB_KEY">
+        <v-expansion-panel v-if="dicomWeb.isConfigured && !hideDicomWeb" :value="DICOM_WEB_KEY">
           <v-expansion-panel-title>
             <v-icon class="collection-header-icon">mdi-cloud-download</v-icon>
             <span class="text-truncate">

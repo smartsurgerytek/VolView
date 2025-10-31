@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
+// import { watch } from 'vue';
 import { loadUserPromptedFiles } from '@/src/actions/loadUserFiles';
 import useRemoteSaveStateStore from '@/src/store/remote-save-state';
 import CloseableDialog from '@/src/components/CloseableDialog.vue';
@@ -12,8 +13,10 @@ import ControlsStripTools from '@/src/components/ControlsStripTools.vue';
 import MessageCenter from '@/src/components/MessageCenter.vue';
 import { MessageType, useMessageStore } from '@/src/store/messages';
 import { ConnectionState, useServerStore } from '@/src/store/server';
-import { useViewStore } from '@/src/store/views';
-import { Layouts, DefaultLayoutName } from '@/src/config';
+// import { useViewStore } from '@/src/store/views';
+// import { Layouts, DefaultLayoutName } from '@/src/config';
+import { getMeasurement } from '../store/tools/measurement';
+// import { getSegmentation } from '../store/tools/segmentation';
 
 interface Props {
   hasData: boolean;
@@ -21,33 +24,33 @@ interface Props {
 
 defineProps<Props>();
 
-function useViewLayout() {
-  const viewStore = useViewStore();
-  const layoutName = ref(DefaultLayoutName);
-  const { layout: currentLayout } = storeToRefs(viewStore);
+// function useViewLayout() {
+//   const viewStore = useViewStore();
+//   const layoutName = ref(DefaultLayoutName);
+//   const { layout: currentLayout } = storeToRefs(viewStore);
 
-  watch(
-    layoutName,
-    () => {
-      const layout = Layouts[layoutName.value] || [];
-      viewStore.setLayout(layout);
-    },
-    {
-      immediate: true,
-    }
-  );
+//   watch(
+//     layoutName,
+//     () => {
+//       const layout = Layouts[layoutName.value] || [];
+//       viewStore.setLayout(layout);
+//     },
+//     {
+//       immediate: true,
+//     }
+//   );
 
-  watch(currentLayout, () => {
-    if (
-      currentLayout.value?.name &&
-      currentLayout.value.name !== layoutName.value
-    ) {
-      layoutName.value = currentLayout.value.name;
-    }
-  });
+//   watch(currentLayout, () => {
+//     if (
+//       currentLayout.value?.name &&
+//       currentLayout.value.name !== layoutName.value
+//     ) {
+//       layoutName.value = currentLayout.value.name;
+//     }
+//   });
 
-  return layoutName;
-}
+//   return layoutName;
+// }
 
 function useSaveControls() {
   const remoteSaveStateStore = useRemoteSaveStateStore();
@@ -114,7 +117,7 @@ function useServerConnection() {
 const settingsDialog = ref(false);
 const messageDialog = ref(false);
 const { icon: connIcon, url: serverUrl } = useServerConnection();
-const layoutName = useViewLayout();
+// const layoutName = useViewLayout();
 const { handleSave, saveDialog, isSaving } = useSaveControls();
 const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
 </script>
@@ -137,7 +140,37 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
       :loading="isSaving"
       @click="handleSave"
     />
+    <control-button
+      size="40"
+      icon="mdi-tray-arrow-down"
+      name="Download"
+    />
     <div class="my-1 tool-separator" />
+    <!-- <control-button
+      size="40"
+      icon="mdi-undo"
+      name="u=Undo"
+      @click=""
+    />
+    <control-button
+      size="40"
+      icon="mdi-redo"
+      name="Redo"
+      @click=""
+    /> -->
+    <div class="my-1 tool-separator" />
+    <control-button
+      size="40"
+      icon="mdi-eyedropper-plus"
+      name="Measurement"
+      @click="getMeasurement"
+    />
+    <control-button
+      size="40"
+      icon="mdi-creation"
+      name="Segmentation"
+    />
+    <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
       <template v-slot:activator="{ props }">
         <div>
@@ -161,7 +194,7 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
           </v-radio-group>
         </v-card-text>
       </v-card>
-    </v-menu>
+    </v-menu> -->
     <controls-strip-tools v-if="hasData" />
     <v-spacer />
     <control-button

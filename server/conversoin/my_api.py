@@ -1,14 +1,23 @@
 from typing import Dict
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Request, HTTPException  
 from fastapi.responses import JSONResponse
 
+import httpx
+import hashlib
 import zipfile
 import json
 import io
 import pydicom
 from pydicom.uid import generate_uid
+
+import numpy as np
+import pydicom
+from PIL import Image
+import base64
+
+import vtk # 匯入 vtk
+from vtk.util import numpy_support
 
 from datetime import datetime
 from utils1 import (
@@ -320,10 +329,8 @@ async def get_series_uid():
         print("No existing Measurement Report series found. A new series will be created.")
         return generate_uid()
 
-import httpx
-import hashlib
 
-# 將 Orthanc 的基礎 URL 設為一個常數，方便未來修改
+# TODO:read ORTHANC_BASE_URL from .env
 ORTHANC_BASE_URL = "http://localhost:8080"
 
 async def delete_orthanc_series(
@@ -432,6 +439,431 @@ async def delete_orthanc_series(
             "error": "Unexpected Error",
             "details": str(e)
         }
+
+@app.post("/api/get_measurement")
+async def get_measurement(request: Request):
+    try:
+        print("Received /api/get_measurement request")
+
+        study_instance_uid = (await request.json()).get('StudyInstanceUID')
+        series_instance_uid = (await request.json()).get('SeriesInstanceUID')
+        sop_instance_uid = (await request.json()).get('SopInstanceUID')
+        current_image_id = (await request.json()).get('ImageID')
+        scale_x = (await request.json()).get('ScaleX')
+        scale_y = (await request.json()).get('ScaleY')
+
+        if not study_instance_uid :
+            raise ValueError("StudyInstanceUID is required in the request body")
+        
+        if not series_instance_uid :
+            raise ValueError("SeriesInstanceUID is required in the request body")
+        
+        if not sop_instance_uid:
+            raise ValueError("SopInstanceUID is required in the request body")
+        
+        if not scale_x:
+            raise ValueError("ScaleX is required in the request body")
+           
+        if not scale_y:
+            raise ValueError("ScaleY is required in the request body")
+     
+        if scale_x == 1:
+            scale_x = 0.03125
+
+        if scale_y == 1:
+            scale_x = 0.03125
+
+        # Get Dicom Instance
+        instance = client.retrieve_instance(
+                study_instance_uid=study_instance_uid,
+                series_instance_uid=series_instance_uid,
+                sop_instance_uid=sop_instance_uid,
+            )
+       
+        # Get Image base64 String 
+        instance_base64 = get_base64_string(instance)
+
+        # invoke dentistry api
+        measurement_response = await get_dentistry_measurement(instance_base64,scale_x, scale_y)
+
+        ruler_list = get_rulers(measurement_response, current_image_id)
+
+        return JSONResponse(
+                content={
+                    'success': True,
+                    'data': ruler_list},  
+                status_code=200
+            )
+
+    except Exception as e:
+        print(f"Error getting measurement: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/get_segmentation")
+async def get_segmentation(request: Request):
+    try:
+        print("Received /api/get_segmentation request")
+
+        study_instance_uid = (await request.json()).get('StudyInstanceUID')
+        series_instance_uid = (await request.json()).get('SeriesInstanceUID')
+        sop_instance_uid = (await request.json()).get('SopInstanceUID')
+
+        if not study_instance_uid :
+            raise ValueError("StudyInstanceUID is required in the request body")
+
+        if not series_instance_uid :
+            raise ValueError("SeriesInstanceUID is required in the request body")
+
+        if not sop_instance_uid:
+            raise ValueError("SopInstanceUID is required in the request body")
+
+        # Get Dicom Instance
+        instance = client.retrieve_instance(
+                study_instance_uid=study_instance_uid,
+                series_instance_uid=series_instance_uid,
+                sop_instance_uid=sop_instance_uid,
+            )
+
+        # Get Image base64 String
+        instance_base64 = get_base64_string(instance)
+
+        # invoke dentistry api
+        segmentation_response = await get_dentistry_segmentation(instance_base64)
+
+        if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
+            raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
+        
+        # ##### TODO: only for testing
+        # debug_filename = "debug_segmentation_response_output.txt"
+        # with open(debug_filename, "w", encoding="utf-8") as f:
+        #     json.dump(segmentation_response, f, indent=4, ensure_ascii=False)
+        # print(f"--- debug_segmentation_response_output已儲存到 {debug_filename} 供除錯 ---")
+        # #####
+
+        vti_content_bytes = get_vti_file(instance,segmentation_response)
+
+        return Response(
+            content=vti_content_bytes,
+            media_type="application/xml",
+            headers={
+                "Content-Disposition": f"attachment; filename=segmentation_{sop_instance_uid}.vti"
+            }
+        )
+
+    except Exception as e:
+        print(f"Error getting segmentation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def get_base64_string(ds):
+    new_image = ds.pixel_array.astype(float)
+
+    # Rescaling the image
+    scaled_image = (np.maximum(new_image, 0) / new_image.max()) * 255.0
+
+    scaled_image = np.uint8(scaled_image)
+    final_image = Image.fromarray(scaled_image)
+
+    # save
+    buffered = io.BytesIO()
+    final_image.save(buffered, format="PNG")
+
+    base64_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    
+    return base64_string
+
+async def get_dentistry_measurement(base64_string: str, scale_x: float, scale_y: float):
+
+    url = "https://api-int.smartsurgerytek.net/v1/pa_measure_dict"
+    payload = {
+            "image": base64_string,
+            "scale_x": scale_x,
+            "scale_y": scale_y
+        }
+
+    # TODO: read the api key in .env
+    query_params = {
+        "key": "apikey"
+        }
+
+    timeout_config = httpx.Timeout(30.0, connect=5.0)
+
+    async with httpx.AsyncClient(timeout=timeout_config) as client:
+        try:
+            print(f"--- ready to invoke Inference API: {url} ---")
+            
+            response = await client.post(
+                url,
+                json=payload,
+                params=query_params
+            )
+            
+            response.raise_for_status()
+
+            response_data = response.json()
+            print(f"成功取得 API 回應 (狀態碼: {response.status_code})")
+            #print(response_data) # 印出 API 回傳的資料
+            return response_data
+
+        except httpx.HTTPStatusError as e:
+            print(f"API 請求錯誤: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            print(f"網路連線錯誤: {e}")
+            raise
+        except json.JSONDecodeError:
+            print(f"無法解析 API 回應 (非 JSON): {response.text}")
+            raise
+
+async def get_dentistry_segmentation(base64_string: str):
+
+    url = "https://api-int.smartsurgerytek.net/v1/pa_segmentation_cvat"
+    payload = {
+            "image": base64_string
+        }
+
+    query_params = {
+        "key": "apikey"
+        }
+    
+    timeout_config = httpx.Timeout(30.0, connect=5.0)
+
+    async with httpx.AsyncClient(timeout=timeout_config) as client:
+        try:
+            print(f"--- ready to invoke Inference API: {url} ---")
+            
+            response = await client.post(
+                url,
+                json=payload,
+                params=query_params
+            )
+            
+            response.raise_for_status()
+
+            response_data = response.json()
+            print(f"成功取得 API 回應 (狀態碼: {response.status_code})")
+            #print(response_data) # 印出 API 回傳的資料
+            return response_data
+
+        except httpx.HTTPStatusError as e:
+            print(f"API 請求錯誤: {e.response.status_code} - {e.response.text}")
+        except httpx.RequestError as e:
+            print(f"網路連線錯誤: {e}")
+            raise
+        except json.JSONDecodeError:
+            print(f"無法解析 API 回應 (非 JSON): {response.text}")
+            raise
+
+def get_rulers(api_response, image_id):
+
+    measurements = api_response.get('measurements')
+
+    rulers_list = []
+
+    for measurement in measurements:
+        pair_measurements = measurement.get('pair_measurements')
+        for pair_measurement in pair_measurements:
+
+            # point
+            cej = pair_measurement.get('CEJ')
+            alc = pair_measurement.get('ALC')
+            apex = pair_measurement.get('APEX')
+
+            ruler_cal = {
+                'stage': pair_measurement.get('stage'),
+                'firstPoint': [cej[0], cej[1], 0],
+                'secondPoint': [alc[0], alc[1], 0],
+                'imageID': image_id,
+                'slice': 0,
+                'placing': False,
+                'frameOfReference': {
+                    'planeNormal': [0, 0, 1],
+                    'planeOrigin': [0, 0, 0]
+                }
+            }
+
+            ruler_trl = {
+                'stage': 'trl',
+                'firstPoint': [cej[0], cej[1], 0],
+                'secondPoint': [apex[0], apex[1], 0],
+                'imageID': image_id,
+                'slice': 0,
+                'placing': False,
+                'frameOfReference': {
+                    'planeNormal': [0, 0, 1],
+                    'planeOrigin': [0, 0, 0]
+                }
+            }
+
+            rulers_list.append(ruler_cal)
+            rulers_list.append(ruler_trl)
+
+    return rulers_list
+
+def get_vti_file(instance, segmentation_response):
+    try:
+        # 3. get metadata
+        H, W = instance.Rows, instance.Columns
+
+        ## afeter set PixelSpacing=[1.0, 1.0] brush works!
+        pixel_spacing = [1.0, 1.0] ## instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0]
+        slice_thickness = float(instance.SliceThickness if "SliceThickness" in instance else 1.0)
+        origin = instance.ImagePositionPatient if "ImagePositionPatient" in instance else [0.0, 0.0, 0.0]
+        
+        # 4. 建立畫布
+        # *** 假設: class ID 範圍為 0-255 (uint8) ***
+        final_mask = np.zeros((H, W), dtype=np.uint8)
+        
+        # 5. 解碼 RLE 並合成 Mask
+        # *** 假設: API 回應的結構如同您的範例 ***
+        # (您可能需要根據您的 API 回應調整 'yolo_results' 和 'yolov8_contents')
+        if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
+            raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
+                    
+        yolov8_contents = segmentation_response['yolo_results']['yolov8_contents']
+            
+        print(f"Processing {len(yolov8_contents)} segmented objects...")
+
+        for obj in yolov8_contents:
+            points = obj.get('points')
+            class_id = obj.get('class_id') 
+
+            if not points or class_id is None:
+                continue
+
+            # 1. 解碼 RLE
+            bbox_mask, x1, y1, x2, y2 = rle2Mask(points)
+                
+            if bbox_mask.size == 0:
+                print(f"Skipping empty mask for class {class_id}")
+                continue
+
+            # 2. 尋找 來源 (bbox_mask) 和 目標 (final_mask) 之間的重疊區域
+            
+            # --- 2a. 計算重疊區域的「全域座標」(相對於 final_mask) ---
+            # BBox 的 x2, y2 是包含在內的，所以結束點要 +1
+            x_start_global = max(x1, 0)
+            y_start_global = max(y1, 0)
+            x_end_global = min(x2 + 1, W) # W 是 final_mask 的寬度
+            y_end_global = min(y2 + 1, H) # H 是 final_mask 的高度
+
+            # --- 2b. 如果根本沒有重疊，就跳過 ---
+            if x_start_global >= x_end_global or y_start_global >= y_end_global:
+                print(f"Skipping mask for class {class_id} (BBox completely out of bounds)")
+                continue
+
+            # --- 2c. 計算重疊區域的「區域座標」(相對於 bbox_mask) ---
+            x_start_local = x_start_global - x1
+            y_start_local = y_start_global - y1
+            x_end_local = x_end_global - x1
+            y_end_local = y_end_global - y1
+
+            # 3. 根據計算好的範圍，從 來源(src) 裁切並貼到 目標(dest)
+            
+            # 取得 來源(bbox_mask) 中要被複製的區域
+            src_slice = (slice(y_start_local, y_end_local), slice(x_start_local, x_end_local))
+            mask_to_paste = bbox_mask[src_slice]
+            
+            # 取得 目標(final_mask) 中要被貼上的區域
+            dest_slice = (slice(y_start_global, y_end_global), slice(x_start_global, x_end_global))
+            paste_region = final_mask[dest_slice]
+
+            # 4. 執行貼上
+            # 只在 mask_to_paste 為 1 (前景) 的地方貼上
+            valid_paste_mask = (mask_to_paste == 1)
+            paste_region[valid_paste_mask] = class_id + 1 # 使用 class_id + 1
+            
+        # 6. 轉換為 VTI (使用 VTK)
+        print("Converting final mask to VTI...")
+
+        # 6.1. 建立 vtkImageData
+        image_data = vtk.vtkImageData()
+        image_data.SetDimensions(W, H, 1) # VTK 順序: (X, Y, Z)
+        image_data.SetSpacing(float(pixel_spacing[1]), float(pixel_spacing[0]), slice_thickness) # (X, Y, Z) Spacing
+        image_data.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2])) # (X, Y, Z) Origin
+
+        # 6.2. 轉換 NumPy 陣列為 VTK 陣列
+        # final_mask (H, W) -> ravel('C') -> (W*H,)
+        vtk_data_array = numpy_support.numpy_to_vtk(
+            num_array=final_mask.ravel(order='C'),
+            deep=True,
+            array_type=vtk.VTK_UNSIGNED_CHAR # 對應 np.uint8
+        )
+            
+        # 6.3. 將資料設定到 vtkImageData
+        image_data.GetPointData().SetScalars(vtk_data_array)
+
+        # 6.4. 寫入記憶體
+        writer = vtk.vtkXMLImageDataWriter()
+        writer.SetDataModeToBinary()
+        writer.SetInputData(image_data)
+        writer.WriteToOutputStringOn()
+        writer.Write()
+        
+        # 取得位元組資料
+        vti_content_bytes = writer.GetOutputString()
+
+        # 7. 回傳 VTI 檔案
+        print("Sending .vti file as response.")
+        
+        # ##### TODO: only for testing
+        # debug_filename = "debug_vti_response_output.vti"
+        # with open(debug_filename, "w", encoding="utf-8") as f:
+        #     f.write(vti_content_bytes)
+        # print(f"--- debug_vti_response_output 已儲存到 {debug_filename} 供除錯 ---")
+        # #####
+        
+        return vti_content_bytes
+        
+    except Exception as e:
+        print(f"Error getting segmentation: {e}")
+        import traceback
+        traceback.print_exc() # 印出詳細的錯誤堆疊
+        raise HTTPException(status_code=500, detail=str(e))
+
+def rle2Mask(rle: list) -> tuple[np.ndarray, int, int, int, int]:
+    """
+    將 RLE (包含 BBox) 解碼為 2D 遮罩陣列
+    返回: (bbox_mask, x1_int, y1_int, x2_int, y2_int)
+    """
+    if len(rle) < 4:
+        # 資料不足
+        return np.zeros((0, 0), dtype=np.uint8), 0, 0, 0, 0
+
+    bbox_coords = rle[-4:]
+    rle_counts = rle[:-4]
+
+    x1, y1, x2, y2 = map(int, bbox_coords)
+
+    rle_int_list_filter = list(map(int, rle_counts))
+    
+    width, height = x2 - x1 + 1, y2 - y1 + 1
+    
+    if width <= 0 or height <= 0:
+        return np.zeros((0, 0), dtype=np.uint8), x1, y1, x2, y2
+        
+    total_pixels = width * height
+    decoded = np.zeros(total_pixels, dtype=np.uint8)
+    idx = 0
+    val = 0
+    
+    try:
+        for count in rle_int_list_filter:
+            end_idx = idx + count
+            if end_idx > total_pixels:
+                
+                decoded[idx:] = val
+                print(f"Warning: RLE data mismatch. Truncating.")
+                break
+                
+            decoded[idx:end_idx] = val
+            idx = end_idx
+            val = 1 - val
+            
+        decoded_mask = decoded.reshape((width, height), order='F').T
+        return decoded_mask, x1, y1, x2, y2
+
+    except Exception as e:
+        print(f"Error decoding RLE: {e}")
+        return np.zeros((0, 0), dtype=np.uint8), x1, y1, x2, y2
     
 app.add_middleware(
     CORSMiddleware,

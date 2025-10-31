@@ -22,6 +22,9 @@ pydicom = "^3.0.1"
 pynetdicom = "^3.0.4"
 httpx = "^0.28.1"
 dicomweb-client = "^0.60.1"
+pillow = "^12.0.0"
+simpleitk = "^2.5.2"
+vtk = "^9.5.2"
 
 [tool.poetry.dev-dependencies]
 

@@ -1,4 +1,6 @@
+import gzip
 from io import BytesIO
+import json
 import pydicom
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import ExplicitVRLittleEndian
@@ -55,6 +57,8 @@ class SRGenerator:
             self._generate_image_library(self.manifest.annotations),
             measurements,
         ]
+        
+        self._add_manifest_info(ds)
         
         return ds
 
@@ -369,4 +373,21 @@ class SRGenerator:
             "Area": ("G-A166", "SRT", "Area"),
         }
         value, scheme, meaning = mapping.get(measurement_name, ("G-D7FE", "SRT", measurement_name))
+        
         return self._generate_code(value, scheme, meaning)
+    
+    def _add_manifest_info(self, ds):
+        print("Adding manifest info to SR DICOM...")
+        # Add manifest-related information to the dataset if needed
+        manifest_text = json.dumps(self.manifest.raw_manifest)
+        # 1️⃣ Define a private creator
+        creator_tag = (0x0043, 0x0010)
+        ds.add_new(creator_tag, 'LO', 'FOUNDATION_MANIFEST')  # name your private block
+
+        # 2️⃣ Define your private tag (in that creator’s block)
+        private_tag = (0x0043, 0x1010)
+        
+        compressed_bytes = gzip.compress(manifest_text.encode("utf-8"))
+
+        # 3️⃣ Store the manifest text (you can compress or json.dumps if needed)
+        ds.add_new(private_tag, 'OB', compressed_bytes)

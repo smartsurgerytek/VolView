@@ -1,3 +1,4 @@
+import gzip
 from typing import Dict
 from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -883,6 +884,22 @@ async def manifest_to_dicom_sr(manifest: Manifest):
         media_type="application/dicom",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@app.post("/dicom_sr_to_manifest")
+async def dicom_sr_to_manifest(request: Request):
+    dicom_bytes = await request.body()
+    ds = pydicom.dcmread(io.BytesIO(dicom_bytes))
+    
+    # Extract the compressed manifest
+    raw = ds[(0x0043, 0x1010)].value
+    # Decompress + decode to text
+    manifest_text = gzip.decompress(raw).decode("utf-8")
+
+    # Convert to JSON/dict
+    manifest_json = json.loads(manifest_text)
+
+    # Return clean JSON
+    return JSONResponse(content=manifest_json)
 
 app.add_middleware(
     CORSMiddleware,

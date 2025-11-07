@@ -1,5 +1,5 @@
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from dataclasses import field
 import uuid
@@ -79,3 +79,4 @@ class Manifest(BaseModel):
     patient_id: str
     patient_birth_date: str
     patient_sex: str
+    raw_manifest: Dict[str, Any]

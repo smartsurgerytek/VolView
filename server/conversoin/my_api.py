@@ -1,7 +1,7 @@
 from typing import Dict
 from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 import httpx
 import hashlib
@@ -16,6 +16,8 @@ import pydicom
 from PIL import Image
 import base64
 
+from models import Manifest
+from sr_generator import SRGenerator
 import vtk # 匯入 vtk
 from vtk.util import numpy_support
 
@@ -40,14 +42,14 @@ from utils2 import (
     create_volview_zip_from_memory
 )
 
-from volview_server import VolViewApi
+# from ..volview_server import VolViewApi
 
-from dicomweb_client.api import DICOMwebClient
+# from dicomweb_client.api import DICOMwebClient
 
-# TODO: url should be configured
-client = DICOMwebClient(url="http://localhost:8080/dicom-web")
+# # TODO: url should be configured
+# client = DICOMwebClient(url="http://localhost:8080/dicom-web")
 
-volview = VolViewApi()
+# volview = VolViewApi()
 
 app = FastAPI()
 
@@ -864,7 +866,24 @@ def rle2Mask(rle: list) -> tuple[np.ndarray, int, int, int, int]:
     except Exception as e:
         print(f"Error decoding RLE: {e}")
         return np.zeros((0, 0), dtype=np.uint8), x1, y1, x2, y2
-    
+
+# manifest to dicom sr api for interoperability
+@app.post("/manifest_to_dicom_sr")
+async def manifest_to_dicom_sr(manifest: Manifest):
+    gen = SRGenerator(manifest)
+    ds = gen.generate()
+
+    buffer = io.BytesIO()
+    ds.save_as(buffer)
+    buffer.seek(0)
+
+    filename = f"{manifest.study_instance_uid}_sr.dcm"
+    return StreamingResponse(
+        buffer,
+        media_type="application/dicom",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

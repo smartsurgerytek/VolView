@@ -4,7 +4,7 @@ import DicomChunkImage from "@/src/core/streaming/dicomChunkImage";
 import { useRulerStore } from "./rulers";
 import { useImageCacheStore } from "../image-cache";
 
-const { VITE_FASTAPI_URL } = import.meta.env;
+const { VITE_FOUNDATION_API } = import.meta.env;
 
 const REQUIRED_LABELS = [
     { name: 'stage 0', color: '#6df24cff', strokeWidth: 3, stageKey: '0' },
@@ -18,7 +18,7 @@ interface ApiRuler {
     stage: string;
     firstPoint: [number, number, number];
     secondPoint: [number, number, number];
-    imageID: string;
+    imageId: string;
 }
 
 interface ApiResponse {
@@ -27,6 +27,7 @@ interface ApiResponse {
 
 interface DicomImageData {
     pixelSpacing: [number, number];
+    patientId:string;
     studyInstanceUID: string;
     seriesInstanceUID: string;
     sopInstanceUID: string;
@@ -38,6 +39,7 @@ function getDicomImageData(currentImageID: string): DicomImageData {
     // default value
     const data = {
         pixelSpacing: [1, 1] as [number, number],
+        patientId:"",
         studyInstanceUID: "",
         seriesInstanceUID: "",
         sopInstanceUID: "",
@@ -58,6 +60,7 @@ function getDicomImageData(currentImageID: string): DicomImageData {
         const metadata = Object.fromEntries(metaPairs);
 
         // --- 1. get UIDs ---
+        data.patientId = metadata[Tags.PatientID] || "";
         data.studyInstanceUID = metadata[Tags.StudyInstanceUID] || "";
         data.seriesInstanceUID = metadata[Tags.SeriesInstanceUID] || "";
         data.sopInstanceUID = metadata[Tags.SOPInstanceUID] || "";
@@ -89,16 +92,20 @@ function getDicomImageData(currentImageID: string): DicomImageData {
 
 async function fetchApiRulers(currentImageID: string, dicomData: DicomImageData): Promise<ApiRuler[]> {
     const {
+        patientId,
         pixelSpacing,
         studyInstanceUID,
         seriesInstanceUID,
         sopInstanceUID,
     } = dicomData;
 
-    const response = await fetch(`${VITE_FASTAPI_URL}/get_measurement`, {
+    const url = `${VITE_FOUNDATION_API}/get-measurement`
+    
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            PatientId: patientId,
             StudyInstanceUID: studyInstanceUID,
             SeriesInstanceUID: seriesInstanceUID,
             SopInstanceUID: sopInstanceUID,
@@ -178,7 +185,7 @@ export async function getMeasurement() {
                 label,
                 firstPoint: ruler.firstPoint,
                 secondPoint: ruler.secondPoint,
-                imageID: ruler.imageID,
+                imageID: ruler.imageId,
                 name: 'Ruler',
                 slice: 0,
                 placing: false,

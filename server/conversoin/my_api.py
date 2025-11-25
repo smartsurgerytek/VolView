@@ -43,12 +43,12 @@ from utils2 import (
     create_volview_zip_from_memory
 )
 
-# from ..volview_server import VolViewApi
+# from volview_server import VolViewApi
 
-# from dicomweb_client.api import DICOMwebClient
+from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-# client = DICOMwebClient(url="http://localhost:8080/dicom-web")
+client = DICOMwebClient(url="http://localhost:8080/dicom-web")
 
 # volview = VolViewApi()
 
@@ -254,13 +254,14 @@ async def load_session_with_anno(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
                 
-            # print('======================')
-            # print(ds.get('SOPInstanceUID'))
-            # print(ds.get('Modality'))
-            # print(ds.get('ReferencedSOPInstanceUID'))
+            print('======================')
+            print(ds.get('SOPInstanceUID'))
+            print(ds.get('Modality'))
+            print(ds.get('ReferencedSOPInstanceUID'))
 
             # simulate datasetid
             if((ds.get('Modality') != 'SR') and (ds.get('Modality') != 'SEG')):
+                print('Found subject instance:', ds.get('SOPInstanceUID'))
                 # try to caculate datasetId
                 datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
                 dataset_uids.append(datasetId)
@@ -268,34 +269,48 @@ async def load_session_with_anno(request: Request):
                 
                 subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
                 subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
+                
                 print('subject_files:', subject_files)
+                
+            # we are assuming only one SR in the study, and it contains the manifest
+            elif ds.get('Modality') == 'SR':
+                print('Found SR instance:', ds.get('SOPInstanceUID'))
+                # Extract the compressed manifest from private tag (0043,1010)
+                raw = ds[(0x0043, 0x1010)].value
+                # Decompress + decode to text
+                manifest_text = gzip.decompress(raw).decode("utf-8")
+
+                # Convert to JSON/dict
+                viewer_session = json.loads(manifest_text)
+                is_manifest_from_sr = True
 
             # subject dicom don't have this tag
-            measurement = ds.get((0x7777,0x12))
+            # measurement = ds.get((0x7777,0x12))
 
-            if(measurement):
-                measurement_dict = DotDict.from_dict(json.loads(measurement.value)) 
-                measurement_data.append(measurement_dict)
+            # if(measurement):
+            #     measurement_dict = DotDict.from_dict(json.loads(measurement.value)) 
+            #     measurement_data.append(measurement_dict)
                 # print('measurement data:', measurement_dict)     
                 # print('measurement id:', measurement_dict['id'])
 
             # print('======================')
 
         generated_datasets, generated_sources, generated_paths = generate_data_structure(dataset_uids, subject_files)
-
-        fake_tools = Tools(
-            crosshairs={"position": (0, 0, 0)},
-            paint={"activeSegmentGroupID": None, "activeSegment": 1, "brushSize": 4},
-            crop={},
-            current="Ruler",
-            polygons={"tools": [], "labels": {}},
-            rectangles={"tools": [], "labels": {}},
-            rulers= Rulers(tools=measurement_data, labels={}),
-            )
         
-        fake_layout = Layout(name="Axial Only", direction="H", items=["Axial"])
-
-        viewer_session = ViewerSession(
+        # if no SR found
+        if not viewer_session:
+            print("No SR found in the study. Creating empty viewer session.")
+            fake_layout = Layout(name="Axial Only", direction="H", items=["Axial"])
+            fake_tools = Tools(
+                crosshairs={"position": (0, 0, 0)},
+                paint={"activeSegmentGroupID": None, "activeSegment": 1, "brushSize": 4},
+                crop={},
+                current="Ruler",
+                polygons={"tools": [], "labels": {}},
+                rectangles={"tools": [], "labels": {}},
+                rulers= Rulers(tools=measurement_data, labels={}),
+                )
+            viewer_session = ViewerSession(
                 version="5.0.1",
                 datasets=generated_datasets,
                 dataSources=generated_sources,
@@ -307,13 +322,15 @@ async def load_session_with_anno(request: Request):
                 parentToLayers=[],
                 primarySelection=dataset_uids[-1]
             )
-
+            is_manifest_from_sr = False
+                
         # Save
         session_zip_bytes = create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
-            client=client)
+            client=client,
+            is_manifest_from_sr=is_manifest_from_sr)
         
         print(f"Session ZIP size: {len(session_zip_bytes)} bytes")
 

@@ -184,7 +184,8 @@ def create_volview_zip_from_memory(
     viewer_session: ViewerSession,
     generated_paths: {Dict[str, str]},
     subject_files: Dict[str, list],
-    client
+    client,
+    is_manifest_from_sr: bool = False
 ) -> bytes:
     """
     根據 ViewerSession 物件和 DICOM 檔案字典，產生 VolView 所需的 ZIP 檔案。
@@ -202,7 +203,11 @@ def create_volview_zip_from_memory(
     try:
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             
-            json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
+            if is_manifest_from_sr:
+                # If manifest is from SR, we assume viewer_session is already JSON string
+                json_output = viewer_session
+            else:
+                json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
             
             zf.writestr("manifest.json", json_output)
         

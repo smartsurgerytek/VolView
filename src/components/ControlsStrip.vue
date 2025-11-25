@@ -59,6 +59,7 @@ function useSaveControls() {
   const saveDialog = ref(false);
 
   const handleSave = () => {
+    // override save, new dicom sr flow
     if (saveUrl.value !== '') {
       remoteSaveStateStore.saveState();
     } else {
@@ -123,28 +124,10 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
 </script>
 
 <template>
-  <div
-    id="tools-strip"
-    class="bg-grey-darken-4 d-flex flex-column align-center"
-  >
-    <control-button
-      size="40"
-      icon="mdi-folder-open"
-      name="Open files"
-      @click="loadUserPromptedFiles"
-    />
-    <control-button
-      size="40"
-      icon="mdi-content-save-all"
-      name="Save"
-      :loading="isSaving"
-      @click="handleSave"
-    />
-    <control-button
-      size="40"
-      icon="mdi-tray-arrow-down"
-      name="Download"
-    />
+  <div id="tools-strip" class="bg-grey-darken-4 d-flex flex-column align-center">
+    <control-button size="40" icon="mdi-folder-open" name="Open files" @click="loadUserPromptedFiles" />
+    <control-button size="40" icon="mdi-content-save-all" name="Save" :loading="isSaving" @click="handleSave" />
+    <control-button size="40" icon="mdi-tray-arrow-down" name="Download" />
     <div class="my-1 tool-separator" />
     <!-- <control-button
       size="40"
@@ -159,17 +142,8 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
       @click=""
     /> -->
     <div class="my-1 tool-separator" />
-    <control-button
-      size="40"
-      icon="mdi-eyedropper-plus"
-      name="Measurement"
-      @click="getMeasurement"
-    />
-    <control-button
-      size="40"
-      icon="mdi-creation"
-      name="Segmentation"
-    />
+    <control-button size="40" icon="mdi-eyedropper-plus" name="Measurement" @click="getMeasurement" />
+    <control-button size="40" icon="mdi-creation" name="Segmentation" />
     <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
       <template v-slot:activator="{ props }">
@@ -182,49 +156,23 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
           />
         </div>
       </template>
-      <v-card>
-        <v-card-text>
-          <v-radio-group v-model="layoutName" class="mt-0" hide-details>
-            <v-radio
-              v-for="(value, key) in Layouts"
-              :key="key"
-              :label="value.name"
-              :value="key"
-            />
-          </v-radio-group>
-        </v-card-text>
-      </v-card>
-    </v-menu> -->
+<v-card>
+  <v-card-text>
+    <v-radio-group v-model="layoutName" class="mt-0" hide-details>
+      <v-radio v-for="(value, key) in Layouts" :key="key" :label="value.name" :value="key" />
+    </v-radio-group>
+  </v-card-text>
+</v-card>
+</v-menu> -->
     <controls-strip-tools v-if="hasData" />
     <v-spacer />
-    <control-button
-      v-if="serverUrl"
-      size="40"
-      :icon="connIcon"
-      name="Open Server Settings"
-      @click="settingsDialog = true"
-    />
-    <v-badge
-      offset-x="10"
-      offset-y="10"
-      :content="msgCount"
-      :color="msgBadgeColor"
-      :model-value="msgCount > 0"
-      id="notifications"
-    >
-      <control-button
-        size="40"
-        icon="mdi-bell-outline"
-        name="Notifications"
-        @click="messageDialog = true"
-      />
+    <control-button v-if="serverUrl" size="40" :icon="connIcon" name="Open Server Settings"
+      @click="settingsDialog = true" />
+    <v-badge offset-x="10" offset-y="10" :content="msgCount" :color="msgBadgeColor" :model-value="msgCount > 0"
+      id="notifications">
+      <control-button size="40" icon="mdi-bell-outline" name="Notifications" @click="messageDialog = true" />
     </v-badge>
-    <control-button
-      size="40"
-      icon="mdi-cog"
-      name="Settings"
-      @click="settingsDialog = true"
-    />
+    <control-button size="40" icon="mdi-cog" name="Settings" @click="settingsDialog = true" />
   </div>
   <closeable-dialog v-model="saveDialog" max-width="30%">
     <template v-slot="{ close }">

@@ -8,20 +8,33 @@ from pydantic import BaseModel
 from pyparsing import Enum
 
 class Shape(Enum):
-    LINE = "line"
-    RECTANGLE = "rectangle"
+    LINE = "Line"
+    RECTANGLE = "Rectangle"
+    
+import re
+
+def from_pascal(name: str) -> str:
+    # Insert underscore before ANY capital letter
+    # except the first one or when multiple capitals appear together (UID)
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 class Annotation(BaseModel):
+        
     shape: Shape
     measurement_name: str
     measurement_value: Optional[float] = None
-    sop_class_uid: str = field(default_factory=lambda: str(uuid.uuid4()))
-    series_instance_uid: str = field(default_factory=lambda: str(uuid.uuid4()))
-    sop_instance_uid: str = field(default_factory=lambda: str(uuid.uuid4()))
-    coordinates: List[float] = field(default_factory=list)
+    sop_class_uid: str #= field(default_factory=lambda: str(uuid.uuid4()))
+    series_instance_uid: str #= field(default_factory=lambda: str(uuid.uuid4()))
+    sop_instance_uid: str #= field(default_factory=lambda: str(uuid.uuid4()))
+    coordinates: List[float]
 
-    def __post_init__(self):
-        self._validate_coordinates()
+    # class Config:
+    #     validate_by_name = True
+    #     alias_generator = from_pascal
+
+    # def __post_init__(self):
+    #     self._validate_coordinates()
 
     @property
     def coord_count(self):
@@ -72,6 +85,7 @@ class Annotation(BaseModel):
         )
 
 class Manifest(BaseModel):
+
     annotations: List[Annotation]
     study_instance_uid: str
     study_id: str
@@ -79,4 +93,8 @@ class Manifest(BaseModel):
     patient_id: str
     patient_birth_date: str
     patient_sex: str
-    raw_manifest: Dict[str, Any]
+    raw_manifest: str
+    
+    # class Config:
+    #     validate_by_name = True
+    #     alias_generator = from_pascal

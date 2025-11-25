@@ -3,6 +3,8 @@ import { useMessageStore } from '@/src/store/messages';
 import { $fetch } from '@/src/utils/fetch';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { createManifest } from '../utils/saveAnnotation';
+import { debug } from 'webdriverio/build/commands/browser';
 
 const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
   const saveUrl = ref('');
@@ -14,23 +16,53 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
     saveUrl.value = url;
   };
 
+  async function extractDicomMetadataFromZip(zipBlob: Blob): Promise<Manifest> {
+
+      const manifest = await createManifest(zipBlob);
+
+      return manifest;
+    }
+
   const saveState = async () => {
     if (!saveUrl.value || isSaving.value) return;
     try {
       isSaving.value = true;
 
       const blob = await serialize();
-      const saveResult = await $fetch(saveUrl.value, {
-        method: 'POST',
+      // const saveResult = await $fetch(saveUrl.value, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/zip',
+      //     'Content-Length': blob.size.toString(),
+      //   },
+      //   body: blob,
+      // });
+
+      const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
+
+      // Call ABP API
+      const response = await fetch("https://localhost:44373/api/app/annotation/save-manifest", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/zip',
-          'Content-Length': blob.size.toString(),
+          "Content-Type": "application/json",
+          // "Authorization": "Bearer " + localStorage.getItem("access_token")
         },
-        body: blob,
+        body: JSON.stringify(manifestAndMetadata)
       });
 
-      if (saveResult.ok) messageStore.addSuccess('Save Successful');
-      else messageStore.addError('Save Failed', 'Network response not OK');
+      if (!response.ok) {
+        // const err = await response.text();
+        throw new Error("Save failed");
+      }
+
+      const result = await response.json();
+
+      // Inform user
+      alert("Manifest saved successfully. Conversion job queued!");
+      console.log("Saved Manifest ID:", result.id);
+
+      // if (saveResult.ok) messageStore.addSuccess('Save Successful');
+      // else messageStore.addError('Save Failed', 'Network response not OK');
     } catch (error) {
       messageStore.addError('Save Failed with error', `Failed from: ${error}`);
     } finally {

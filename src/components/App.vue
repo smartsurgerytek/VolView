@@ -3,14 +3,7 @@
     <template v-slot="{ dragHover }">
       <v-app>
         <app-bar @click:left-menu="leftSideBar = !leftSideBar"></app-bar>
-        <v-navigation-drawer
-          v-model="leftSideBar"
-          app
-          clipped
-          touchless
-          width="450"
-          id="left-nav"
-        >
+        <v-navigation-drawer v-model="leftSideBar" app clipped touchless width="450" id="left-nav">
           <module-panel @close="leftSideBar = false" />
         </v-navigation-drawer>
         <v-main id="content-main">
@@ -18,25 +11,14 @@
             <controls-strip :has-data="hasData"></controls-strip>
             <div class="d-flex flex-column flex-grow-1">
               <layout-grid v-show="hasData" :layout="layout" />
-              <welcome-page
-                v-if="!hasData"
-                :loading="showLoading"
-                class="clickable"
-                @click="loadUserPromptedFiles"
-              >
+              <welcome-page v-if="!hasData" :loading="showLoading" class="clickable" @click="loadUserPromptedFiles">
               </welcome-page>
             </div>
           </div>
         </v-main>
         <controls-modal />
       </v-app>
-      <persistent-overlay
-        :disabled="!dragHover"
-        color="#000"
-        :opacity="0.3"
-        :z-index="2000"
-        class="text-center"
-      >
+      <persistent-overlay :disabled="!dragHover" color="#000" :opacity="0.3" :z-index="2000" class="text-center">
         <div class="d-flex flex-column align-center justify-center h-100">
           <div class="dnd-prompt">
             <v-icon size="4.75rem">mdi-download</v-icon>
@@ -212,7 +194,7 @@ export default defineComponent({
   border-right: 1px solid rgb(var(--v-theme-background));
 }
 
-#content-main > .v-content__wrap {
+#content-main>.v-content__wrap {
   display: flex;
 }
 
@@ -221,7 +203,7 @@ export default defineComponent({
   margin-top: 15px;
 }
 
-.alert > .v-snack__wrapper {
+.alert>.v-snack__wrapper {
   /* transition background color */
   transition: background-color 0.25s;
 }

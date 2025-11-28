@@ -1,4 +1,5 @@
 import gzip
+import os
 from typing import Dict
 from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,8 +48,9 @@ from utils2 import (
 
 from dicomweb_client.api import DICOMwebClient
 
-# # TODO: url should be configured
-client = DICOMwebClient(url="http://localhost:8080/dicom-web")
+# Read DICOMWEB URL from environment variable
+DICOMWEB_URL = os.getenv("DICOMWEB_URL", "http://localhost:8080/dicom-web")
+client = DICOMwebClient(url=DICOMWEB_URL)
 
 # volview = VolViewApi()
 
@@ -350,8 +352,8 @@ async def get_series_uid():
         return generate_uid()
 
 
-# TODO:read ORTHANC_BASE_URL from .env
-ORTHANC_BASE_URL = "http://localhost:8080"
+# Read ORTHANC_BASE_URL from environment variable (without /dicom-web path)
+ORTHANC_BASE_URL = os.getenv("DICOMWEB_URL", "http://localhost:8080/dicom-web").replace("/dicom-web", "")
 
 async def delete_orthanc_series(
     patient_id: str, 

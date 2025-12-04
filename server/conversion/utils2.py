@@ -29,7 +29,7 @@ class Crosshairs(BaseModel):
 
 class Paint(BaseModel):
     activeSegmentGroupID: Optional[Any] # JSON 中為 null
-    activeSegment: int
+    activeSegment: Optional[int] = None
     brushSize: int
 
 class CropBounds(BaseModel):
@@ -201,14 +201,15 @@ def create_volview_zip_from_memory(
     zip_buffer = io.BytesIO()
 
     try:
+        print("Creating ZIP file in memory...")
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             
-            if is_manifest_from_sr:
-                # If manifest is from SR, we assume viewer_session is already JSON string
-                json_output = viewer_session
-            else:
-                json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
-            
+            # if is_manifest_from_sr:
+            #     # If manifest is from SR, we assume viewer_session is already JSON string
+            #     json_output = viewer_session
+            # else:
+            json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
+            print(json_output)
             zf.writestr("manifest.json", json_output)
         
             for path in generated_paths.values():

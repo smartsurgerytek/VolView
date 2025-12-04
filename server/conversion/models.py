@@ -1,11 +1,10 @@
 
+from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 from dataclasses import field
 import uuid
 from attr import asdict
-from pydantic import BaseModel
-from pyparsing import Enum
 
 class Shape(Enum):
     LINE = "Line"
@@ -29,13 +28,6 @@ class Annotation(BaseModel):
     sop_instance_uid: str #= field(default_factory=lambda: str(uuid.uuid4()))
     coordinates: List[float]
 
-    # class Config:
-    #     validate_by_name = True
-    #     alias_generator = from_pascal
-
-    # def __post_init__(self):
-    #     self._validate_coordinates()
-
     @property
     def coord_count(self):
         return len(self.coordinates)
@@ -47,12 +39,6 @@ class Annotation(BaseModel):
     @property
     def is_rectangle(self):
         return self.shape == Shape.RECTANGLE
-
-    def validate_coordinates(self):
-        if self.is_line and self.coord_count != 4:
-            raise ValueError("LINE requires exactly 4 coordinate values (x1, y1, x2, y2).")
-        if self.is_rectangle and self.coord_count != 10:
-            raise ValueError("RECTANGLE requires exactly 10 coordinate values.")
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -94,7 +80,3 @@ class Manifest(BaseModel):
     patient_birth_date: str
     patient_sex: str
     raw_manifest: str
-    
-    # class Config:
-    #     validate_by_name = True
-    #     alias_generator = from_pascal

@@ -1,6 +1,7 @@
 import gzip
+from pathlib import Path
 from typing import Dict
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import Depends, FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -18,6 +19,8 @@ from PIL import Image
 import base64
 
 from models import Manifest
+# from conversion import settings
+import settings
 from sr_generator import SRGenerator
 import vtk # 匯入 vtk
 from vtk.util import numpy_support
@@ -48,12 +51,21 @@ from utils2 import (
 from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-client = DICOMwebClient(url="http://localhost:8080/dicom-web")
+dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
+client = DICOMwebClient(url=dicomweb_url)
 
 # volview = VolViewApi()
 
 app = FastAPI()
 
+@app.on_event("startup")
+async def startup_event():
+    app.state.http_client = httpx.AsyncClient(verify=False)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await app.state.http_client.aclose()
+    
 @app.post("/api/save")  
 async def save_session_to_sr_and_seg(request: Request):
     try:
@@ -225,7 +237,7 @@ async def load_session(request: Request):
 async def load_session_with_anno(request: Request):
     try:
         print("Received /api/load_with_anno request")
-
+        apiClient: httpx.AsyncClient = app.state.http_client
         study_instance_uid = (await request.json()).get('StudyInstanceUID')
 
         # Validate input : StudyInstanceUID
@@ -254,10 +266,10 @@ async def load_session_with_anno(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
                 
-            print('======================')
-            print(ds.get('SOPInstanceUID'))
-            print(ds.get('Modality'))
-            print(ds.get('ReferencedSOPInstanceUID'))
+            # print('======================')
+            # print(ds.get('SOPInstanceUID'))
+            # print(ds.get('Modality'))
+            # print(ds.get('ReferencedSOPInstanceUID'))
 
             # simulate datasetid
             if((ds.get('Modality') != 'SR') and (ds.get('Modality') != 'SEG')):
@@ -270,30 +282,26 @@ async def load_session_with_anno(request: Request):
                 subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
                 subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
                 
-                print('subject_files:', subject_files)
+                # print('subject_files:', subject_files)
                 
             # we are assuming only one SR in the study, and it contains the manifest
             elif ds.get('Modality') == 'SR':
                 print('Found SR instance:', ds.get('SOPInstanceUID'))
                 # Extract the compressed manifest from private tag (0043,1010)
-                raw = ds[(0x0043, 0x1010)].value
+                # raw = ds[(0x0043, 0x1010)].value
                 # Decompress + decode to text
-                manifest_text = gzip.decompress(raw).decode("utf-8")
-
+                # manifest_text = gzip.decompress(raw).decode("utf-8")                
+        
+                # fetch manifest from api host's api
+                abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
+                print(str(abpapi_url))
+                # Send GET with query param
+                response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
+                response.raise_for_status()
+                
                 # Convert to JSON/dict
-                viewer_session = json.loads(manifest_text)
+                viewer_session = ViewerSession(**response.json())
                 is_manifest_from_sr = True
-
-            # subject dicom don't have this tag
-            # measurement = ds.get((0x7777,0x12))
-
-            # if(measurement):
-            #     measurement_dict = DotDict.from_dict(json.loads(measurement.value)) 
-            #     measurement_data.append(measurement_dict)
-                # print('measurement data:', measurement_dict)     
-                # print('measurement id:', measurement_dict['id'])
-
-            # print('======================')
 
         generated_datasets, generated_sources, generated_paths = generate_data_structure(dataset_uids, subject_files)
         

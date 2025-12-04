@@ -58,7 +58,8 @@ class SRGenerator:
             measurements,
         ]
         
-        self._add_manifest_info(ds)
+        # commented out for now
+        # self._add_manifest_info(ds)
         
         return ds
 

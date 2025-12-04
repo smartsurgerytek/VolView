@@ -1,10 +1,8 @@
 import { serialize } from '@/src/io/state-file';
 import { useMessageStore } from '@/src/store/messages';
-import { $fetch } from '@/src/utils/fetch';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { createManifest } from '../utils/saveAnnotation';
-import { debug } from 'webdriverio/build/commands/browser';
 
 const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
   const saveUrl = ref('');
@@ -29,19 +27,13 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       isSaving.value = true;
 
       const blob = await serialize();
-      // const saveResult = await $fetch(saveUrl.value, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/zip',
-      //     'Content-Length': blob.size.toString(),
-      //   },
-      //   body: blob,
-      // });
 
       const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
+      const { VITE_FOUNDATION_API } = import.meta.env;
 
       // Call ABP API
-      const response = await fetch("https://localhost:44373/api/app/annotation/save-manifest", {
+      const saveManifestUrl = `${VITE_FOUNDATION_API}/save-manifest`;
+      const response = await fetch(saveManifestUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -60,9 +52,6 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       // Inform user
       alert("Manifest saved successfully. Conversion job queued!");
       console.log("Saved Manifest ID:", result.id);
-
-      // if (saveResult.ok) messageStore.addSuccess('Save Successful');
-      // else messageStore.addError('Save Failed', 'Network response not OK');
     } catch (error) {
       messageStore.addError('Save Failed with error', `Failed from: ${error}`);
     } finally {

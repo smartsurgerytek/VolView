@@ -21,7 +21,6 @@
 
 <script lang="ts">
 import { defineComponent, onMounted, ref } from 'vue';
-// import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import { onKeyDown } from '@vueuse/core';
 import * as dicomParser from "dicom-parser";
@@ -55,7 +54,6 @@ export default defineComponent({
         saving.value = true;
         try {
           const blob = await serialize();
-          // saveAs(blob, fileName.value);
           props.close();
 
           const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
@@ -71,14 +69,11 @@ export default defineComponent({
           });
 
           if (!response.ok) {
-            // const err = await response.text();
             throw new Error("Save failed");
           }
 
           const result = await response.json();
 
-          // Inform user
-          alert("Manifest saved successfully. Conversion job queued!");
           console.log("Saved Manifest ID:", result.id);
         }
         catch (error) {

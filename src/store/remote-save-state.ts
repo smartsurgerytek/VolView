@@ -49,8 +49,6 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
 
       const result = await response.json();
 
-      // Inform user
-      alert("Manifest saved successfully. Conversion job queued!");
       console.log("Saved Manifest ID:", result.id);
     } catch (error) {
       messageStore.addError('Save Failed with error', `Failed from: ${error}`);

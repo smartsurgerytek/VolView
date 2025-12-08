@@ -3,10 +3,11 @@ import { useMessageStore } from '@/src/store/messages';
 import { $fetch } from '@/src/utils/fetch';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { createManifest } from '../utils/saveAnnotation';
+import { createManifest, Manifest } from '../utils/saveAnnotation';
 import { debug } from 'webdriverio/build/commands/browser';
 
 const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
+  const { VITE_FOUNDATION_APPSERVICE } = import.meta.env;
   const saveUrl = ref('');
   const isSaving = ref(false);
 
@@ -41,7 +42,7 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
 
       // Call ABP API
-      const response = await fetch("https://localhost:44373/api/app/annotation/save-manifest", {
+      const response = await fetch(`${VITE_FOUNDATION_APPSERVICE}/annotation/save-manifest`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

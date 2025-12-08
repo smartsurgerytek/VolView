@@ -23,12 +23,10 @@
 import { defineComponent, onMounted, ref } from 'vue';
 // import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import { onKeyDown } from '@vueuse/core';
-import * as dicomParser from "dicom-parser";
-
 import { serialize } from '../io/state-file';
 import { createManifest, Manifest } from '../utils/saveAnnotation';
 
+const { VITE_FOUNDATION_APPSERVICE } = import.meta.env;
 const DEFAULT_FILENAME = 'session.volview.zip';
 
 export default defineComponent({
@@ -61,7 +59,7 @@ export default defineComponent({
           const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
 
           // Call ABP API
-          const response = await fetch("https://localhost:44373/api/app/annotation/save-manifest", {
+          const response = await fetch(`${VITE_FOUNDATION_APPSERVICE}/annotation/save-manifest`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

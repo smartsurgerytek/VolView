@@ -1,8 +1,8 @@
 import { serialize } from '@/src/io/state-file';
 import { useMessageStore } from '@/src/store/messages';
-import { $fetch } from '@/src/utils/fetch';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+import { createManifest } from '../utils/saveAnnotation';
 
 const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
   const saveUrl = ref('');
@@ -14,23 +14,42 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
     saveUrl.value = url;
   };
 
+  async function extractDicomMetadataFromZip(zipBlob: Blob): Promise<Manifest> {
+
+      const manifest = await createManifest(zipBlob);
+
+      return manifest;
+    }
+
   const saveState = async () => {
     if (!saveUrl.value || isSaving.value) return;
     try {
       isSaving.value = true;
 
       const blob = await serialize();
-      const saveResult = await $fetch(saveUrl.value, {
-        method: 'POST',
+
+      const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
+      const { VITE_FOUNDATION_API } = import.meta.env;
+
+      // Call ABP API
+      const saveManifestUrl = `${VITE_FOUNDATION_API}/save-manifest`;
+      const response = await fetch(saveManifestUrl, {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/zip',
-          'Content-Length': blob.size.toString(),
+          "Content-Type": "application/json",
+          // "Authorization": "Bearer " + localStorage.getItem("access_token")
         },
-        body: blob,
+        body: JSON.stringify(manifestAndMetadata)
       });
 
-      if (saveResult.ok) messageStore.addSuccess('Save Successful');
-      else messageStore.addError('Save Failed', 'Network response not OK');
+      if (!response.ok) {
+        // const err = await response.text();
+        throw new Error("Save failed");
+      }
+
+      const result = await response.json();
+
+      console.log("Saved Manifest ID:", result.id);
     } catch (error) {
       messageStore.addError('Save Failed with error', `Failed from: ${error}`);
     } finally {

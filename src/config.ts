@@ -110,7 +110,7 @@ export const DefaultViewSpec = InitViewSpecs[InitViewIDs.Axial];
 /**
  * The default layout.
  */
-export const DefaultLayoutName = 'Quad View';
+export const DefaultLayoutName = 'Axial Only';
 
 /**
  * Defines the default layouts.

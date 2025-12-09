@@ -3,14 +3,7 @@
     <template v-slot="{ dragHover }">
       <v-app>
         <app-bar @click:left-menu="leftSideBar = !leftSideBar"></app-bar>
-        <v-navigation-drawer
-          v-model="leftSideBar"
-          app
-          clipped
-          touchless
-          width="450"
-          id="left-nav"
-        >
+        <v-navigation-drawer v-model="leftSideBar" app clipped touchless width="450" id="left-nav">
           <module-panel @close="leftSideBar = false" />
         </v-navigation-drawer>
         <v-main id="content-main">
@@ -18,25 +11,14 @@
             <controls-strip :has-data="hasData"></controls-strip>
             <div class="d-flex flex-column flex-grow-1">
               <layout-grid v-show="hasData" :layout="layout" />
-              <welcome-page
-                v-if="!hasData"
-                :loading="showLoading"
-                class="clickable"
-                @click="loadUserPromptedFiles"
-              >
+              <welcome-page v-if="!hasData" :loading="showLoading" class="clickable" @click="loadUserPromptedFiles">
               </welcome-page>
             </div>
           </div>
         </v-main>
         <controls-modal />
       </v-app>
-      <persistent-overlay
-        :disabled="!dragHover"
-        color="#000"
-        :opacity="0.3"
-        :z-index="2000"
-        class="text-center"
-      >
+      <persistent-overlay :disabled="!dragHover" color="#000" :opacity="0.3" :z-index="2000" class="text-center">
         <div class="d-flex flex-column align-center justify-center h-100">
           <div class="dnd-prompt">
             <v-icon size="4.75rem">mdi-download</v-icon>
@@ -81,6 +63,7 @@ import {
   stripTokenFromUrl,
 } from '@/src/utils/token';
 import { defaultImageMetadata } from '@/src/core/progressiveImage';
+import { useDicomWebStore } from '../store/dicom-web/dicom-web-store';
 
 export default defineComponent({
   name: 'App',
@@ -99,6 +82,7 @@ export default defineComponent({
   setup() {
     const imageStore = useImageStore();
     const dicomStore = useDICOMStore();
+    const dicomWebStore = useDicomWebStore();
 
     useGlobalErrorHook();
     useKeyboardShortcuts();
@@ -140,11 +124,24 @@ export default defineComponent({
     const urlParams = vtkURLExtract.extractURLParameters() as UrlParams;
 
     onMounted(() => {
-      if (!urlParams.urls) {
-        return;
+      if (urlParams.urls) {
+        loadUrls(urlParams);
       }
 
-      loadUrls(urlParams);
+      else if (urlParams.StudyInstanceUIDs) {
+
+        const uids = urlParams.StudyInstanceUIDs;
+        const studyUID = Array.isArray(uids) ? uids[0] : uids;
+
+        if (studyUID) {
+          const { VITE_DICOM_WEB_URL } = import.meta.env;
+
+          const fullUrl = `${VITE_DICOM_WEB_URL}/studies/${studyUID}`;
+
+          dicomWebStore.host = fullUrl;
+          dicomWebStore.fetchDicomsOnce();
+        }
+      }
     });
 
     // --- remote server --- //
@@ -156,11 +153,12 @@ export default defineComponent({
     });
 
     // --- save state --- //
-    if (import.meta.env.VITE_ENABLE_REMOTE_SAVE && urlParams.save) {
-      const url = Array.isArray(urlParams.save)
-        ? urlParams.save[0]
-        : urlParams.save;
-      useRemoteSaveStateStore().setSaveUrl(url);
+    if (import.meta.env.VITE_ENABLE_REMOTE_SAVE === 'true' && import.meta.env.VITE_REMOTE_SAVE_URL) {
+      const saveUrl = import.meta.env.VITE_REMOTE_SAVE_URL || urlParams.save;
+      if (saveUrl) {
+        const url = Array.isArray(saveUrl) ? saveUrl[0] : saveUrl;
+        useRemoteSaveStateStore().setSaveUrl(url);
+      }
     }
 
     // --- layout --- //
@@ -196,7 +194,7 @@ export default defineComponent({
   border-right: 1px solid rgb(var(--v-theme-background));
 }
 
-#content-main > .v-content__wrap {
+#content-main>.v-content__wrap {
   display: flex;
 }
 
@@ -205,7 +203,7 @@ export default defineComponent({
   margin-top: 15px;
 }
 
-.alert > .v-snack__wrapper {
+.alert>.v-snack__wrapper {
   /* transition background color */
   transition: background-color 0.25s;
 }

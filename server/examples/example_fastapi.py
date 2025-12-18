@@ -13,6 +13,19 @@ from example_api import volview
 
 app = FastAPI()
 
+
+@app.middleware("http")
+async def log_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    print(f"===============logs start=================")
+    print(f"Request URL: {request.url}")
+    print(f"Origin: {request.headers.get('origin')}")
+    print(f"CORS headers applied: {response.headers.get('access-control-allow-origin')}")
+    print(f"===============logs end===================")
+    return response
+
+
+
 # Set CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -28,16 +41,6 @@ app.add_middleware(
 # Adds volview middleware
 app.add_middleware(volview)
 
-
-@app.middleware("http")
-async def log_cors_headers(request: Request, call_next):
-    response = await call_next(request)
-    print(f"===============logs start=================")
-    print(f"Request URL: {request.url}")
-    print(f"Origin: {request.headers.get('origin')}")
-    print(f"CORS headers applied: {response.headers.get('access-control-allow-origin')}")
-    print(f"===============logs end===================")
-    return response
 
 
 @app.get("/")

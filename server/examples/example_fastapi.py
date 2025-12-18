@@ -13,9 +13,6 @@ from example_api import volview
 
 app = FastAPI()
 
-# Adds volview middlware
-app.add_middleware(volview)
-
 # Set CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -27,6 +24,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Adds volview middlware
+app.add_middleware(volview)
+
+
 
 
 

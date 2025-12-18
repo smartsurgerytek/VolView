@@ -18,7 +18,7 @@ import pydicom
 from PIL import Image
 import base64
 
-from models import Manifest
+from server.models import Manifest
 # from conversion import settings
 import settings
 from sr_generator import SRGenerator

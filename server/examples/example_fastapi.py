@@ -20,10 +20,14 @@ app.add_middleware(volview)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-                "https://volview-frontend-int-449134413394.asia-east1.run.app",
+        "https://volview-frontend-int-449134413394.asia-east1.run.app",
         "https://idental-blazor-int-449134413394.asia-east1.run.app",
     ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
 
 
 @app.get("/")

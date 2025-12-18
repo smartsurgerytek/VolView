@@ -19,7 +19,10 @@ app.add_middleware(volview)
 # Set CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://volview-frontend-int-449134413394.asia-east1.run.app",
+        "https://idental-blazor-int-449134413394.asia-east1.run.app",
+    ],
 )
 
 

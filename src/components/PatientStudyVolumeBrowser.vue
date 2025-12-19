@@ -12,6 +12,7 @@ import { useMultiSelection } from '../composables/useMultiSelection';
 import { useMessageStore } from '../store/messages';
 import { useLayersStore } from '../store/datasets-layers';
 import PersistentOverlay from './PersistentOverlay.vue';
+import { useImageSelectionStore } from '../store/image-selection';
 
 function dicomCacheKey(volKey: string) {
   return `dicom-${volKey}`;
@@ -39,6 +40,7 @@ export default defineComponent({
     const datasetStore = useDatasetStore();
     const layersStore = useLayersStore();
     const imageCacheStore = useImageCacheStore();
+    const imageSelectionStore = useImageSelectionStore();
 
     const primarySelectionRef = computed(() => datasetStore.primarySelection);
     const volumes = computed(() => {
@@ -139,6 +141,11 @@ export default defineComponent({
 
     const { selected, selectedAll, selectedSome, toggleSelectAll } =
       useMultiSelection(volumeKeys);
+
+     watch(selected, (newSelection) => {
+      imageSelectionStore.setSelectedImageIDs(newSelection);
+    }, { immediate: true });
+
 
     const removeData = (key: string) => {
       datasetStore.remove(key);

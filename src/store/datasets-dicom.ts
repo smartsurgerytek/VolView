@@ -47,6 +47,7 @@ export interface VolumeInfo {
   SeriesDescription: string;
   WindowLevel: string;
   WindowWidth: string;
+  SOPInstanceUID: string;
 }
 
 const buildImage = async (seriesFiles: File[], modality: string) => {
@@ -210,7 +211,7 @@ export const useDICOMStore = defineStore('dicom', {
             AccessionNumber: metadata[Tags.AccessionNumber],
             StudyDescription: metadata[Tags.StudyDescription],
           };
-
+          
           const volumeInfo: VolumeInfo = {
             NumberOfSlices: image.getChunks().length,
             VolumeID: id,
@@ -220,6 +221,7 @@ export const useDICOMStore = defineStore('dicom', {
             SeriesDescription: metadata[Tags.SeriesDescription],
             WindowLevel: metadata[Tags.WindowLevel],
             WindowWidth: metadata[Tags.WindowWidth],
+            SOPInstanceUID: metadata[Tags.SOPInstanceUID],
           };
 
           this._updateDatabase(patientInfo, studyInfo, volumeInfo);

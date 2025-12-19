@@ -1,2 +1,2 @@
-DICOMWEB_URL: str = "http://localhost:8080/dicom-web"  
-ABPAPI_URL: str = "https://localhost:44373/api/volview" 
+DICOMWEB_URL: str = "https://idental-orthanc-int-449134413394.asia-east1.run.app/dicom-web"  
+ABPAPI_URL: str = "https://idental-httpapi-host-int-449134413394.asia-east1.run.app/api/volview" 

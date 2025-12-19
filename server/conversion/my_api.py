@@ -51,7 +51,7 @@ from utils2 import (
 from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
+dicomweb_url = settings.DICOMWEB_URL #"https://idental-orthanc-int-449134413394.asia-east1.run.app/dicom-web"
 client = DICOMwebClient(url=dicomweb_url)
 
 # volview = VolViewApi()
@@ -293,7 +293,7 @@ async def load_session_with_anno(request: Request):
                 # manifest_text = gzip.decompress(raw).decode("utf-8")                
         
                 # fetch manifest from api host's api
-                abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
+                abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://idental-orthanc-int-449134413394.asia-east1.run.app/api/app/annotation/manifest"
                 print(str(abpapi_url))
                 # Send GET with query param
                 response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
@@ -359,7 +359,7 @@ async def get_series_uid():
 
 
 # TODO:read ORTHANC_BASE_URL from .env
-ORTHANC_BASE_URL = "http://localhost:8080"
+ORTHANC_BASE_URL = "https://idental-orthanc-int-449134413394.asia-east1.run.app"
 
 async def delete_orthanc_series(
     patient_id: str, 

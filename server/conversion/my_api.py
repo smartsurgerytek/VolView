@@ -293,10 +293,12 @@ async def load_session_with_anno(request: Request):
                 # manifest_text = gzip.decompress(raw).decode("utf-8")                
         
                 # fetch manifest from api host's api
-                abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
+                # abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
+                
+                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
                 print(str(abpapi_url))
                 # Send GET with query param
-                response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
+                response = await apiClient.get(str(abpapi_url))
                 response.raise_for_status()
                 
                 # Convert to JSON/dict

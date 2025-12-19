@@ -20,13 +20,14 @@ import base64
 
 from .models import Manifest
 # from conversion import settings
-import settings
-from sr_generator import SRGenerator
+from . import settings
+from .sr_generator import SRGenerator 
+
 import vtk # 匯入 vtk
 from vtk.util import numpy_support
 
 from datetime import datetime
-from utils1 import (
+from .utils1 import (
     DotDict,
     get_filepath_for_subject,
     read_file_from_zip,
@@ -37,7 +38,7 @@ from utils1 import (
     update_private_tags
 )
 
-from utils2 import (
+from .utils2 import (
     Rulers,
     Tools,
     Layout,

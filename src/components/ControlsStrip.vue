@@ -2,7 +2,7 @@
 import { storeToRefs } from 'pinia';
 import { ref, computed } from 'vue';
 // import { watch } from 'vue';
-import { loadUserPromptedFiles } from '@/src/actions/loadUserFiles';
+// import { loadUserPromptedFiles } from '@/src/actions/loadUserFiles';
 import useRemoteSaveStateStore from '@/src/store/remote-save-state';
 import CloseableDialog from '@/src/components/CloseableDialog.vue';
 import SaveSession from '@/src/components/SaveSession.vue';
@@ -16,7 +16,9 @@ import { ConnectionState, useServerStore } from '@/src/store/server';
 // import { useViewStore } from '@/src/store/views';
 // import { Layouts, DefaultLayoutName } from '@/src/config';
 import { getMeasurement } from '../store/tools/measurement';
-// import { getSegmentation } from '../store/tools/segmentation';
+// import { useDatasetStore } from '../store/datasets';
+import { useImageSelectionStore } from '../store/image-selection';
+import { generateRecord } from '../actions/generateRecord';
 
 interface Props {
   hasData: boolean;
@@ -115,21 +117,30 @@ function useServerConnection() {
   return { icon, url };
 }
 
+// const dataStore = useDatasetStore();
+const imageSelectionStore = useImageSelectionStore();
+const { selectedImageIDs: selected } = storeToRefs(imageSelectionStore);
+
+function handleGenerateRecord() {
+  generateRecord(selected.value);
+}
+
 const settingsDialog = ref(false);
 const messageDialog = ref(false);
-const { icon: connIcon, url: serverUrl } = useServerConnection();
+// const { icon: connIcon, url: serverUrl } = useServerConnection();
 // const layoutName = useViewLayout();
 const { handleSave, saveDialog, isSaving } = useSaveControls();
-const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
+// const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
 </script>
 
 <template>
   <div id="tools-strip" class="bg-grey-darken-4 d-flex flex-column align-center">
-    <control-button size="40" icon="mdi-folder-open" name="Open files" @click="loadUserPromptedFiles" />
+    <!-- <control-button size="40" icon="mdi-folder-open" name="Open files" @click="loadUserPromptedFiles" /> -->
     <control-button size="40" icon="mdi-content-save-all" name="Save" :loading="isSaving" @click="handleSave" />
     <control-button size="40" icon="mdi-tray-arrow-down" name="Download" />
+    <control-button size="40" icon="mdi-file-document-multiple" name="Record" @click="handleGenerateRecord"/>
     <div class="my-1 tool-separator" />
-    <!-- <control-button
+    <control-button
       size="40"
       icon="mdi-undo"
       name="u=Undo"
@@ -140,9 +151,9 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
       icon="mdi-redo"
       name="Redo"
       @click=""
-    /> -->
+    />
     <div class="my-1 tool-separator" />
-    <control-button size="40" icon="mdi-eyedropper-plus" name="Measurement" @click="getMeasurement" />
+    <control-button size="40" icon="mdi-ruler-square" name="Measurement" @click="getMeasurement" />
     <control-button size="40" icon="mdi-creation" name="Segmentation" />
     <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
@@ -156,23 +167,27 @@ const { count: msgCount, badgeColor: msgBadgeColor } = useMessageBubble();
           />
         </div>
       </template>
-<v-card>
-  <v-card-text>
-    <v-radio-group v-model="layoutName" class="mt-0" hide-details>
-      <v-radio v-for="(value, key) in Layouts" :key="key" :label="value.name" :value="key" />
-    </v-radio-group>
-  </v-card-text>
-</v-card>
-</v-menu> -->
+    <v-card>
+      <v-card-text>
+        <v-radio-group v-model="layoutName" class="mt-0" hide-details>
+          <v-radio v-for="(value, key) in Layouts" :key="key" :label="value.name" :value="key" />
+        </v-radio-group>
+      </v-card-text>
+    </v-card>
+    </v-menu> -->
+
     <controls-strip-tools v-if="hasData" />
     <v-spacer />
-    <control-button v-if="serverUrl" size="40" :icon="connIcon" name="Open Server Settings"
+
+    <!-- Hide setting button for now -->
+
+    <!-- <control-button v-if="serverUrl" size="40" :icon="connIcon" name="Open Server Settings"
       @click="settingsDialog = true" />
     <v-badge offset-x="10" offset-y="10" :content="msgCount" :color="msgBadgeColor" :model-value="msgCount > 0"
       id="notifications">
       <control-button size="40" icon="mdi-bell-outline" name="Notifications" @click="messageDialog = true" />
-    </v-badge>
-    <control-button size="40" icon="mdi-cog" name="Settings" @click="settingsDialog = true" />
+    </v-badge> -->
+    <!-- <control-button size="40" icon="mdi-cog" name="Settings" @click="settingsDialog = true" /> -->
   </div>
   <closeable-dialog v-model="saveDialog" max-width="30%">
     <template v-slot="{ close }">

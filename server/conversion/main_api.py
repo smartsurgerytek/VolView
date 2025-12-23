@@ -50,6 +50,12 @@ from utils2 import (
 
 from dicomweb_client.api import DICOMwebClient
 
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import FileResponse
+from pathlib import Path
+import subprocess
+import json
+
 # # TODO: url should be configured
 dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
 client = DICOMwebClient(url=dicomweb_url)
@@ -293,12 +299,10 @@ async def load_session_with_anno(request: Request):
                 # manifest_text = gzip.decompress(raw).decode("utf-8")                
         
                 # fetch manifest from api host's api
-                # abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
-                
-                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
+                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}" #"https://localhost:44373/api/app/annotation/manifest"
                 print(str(abpapi_url))
                 # Send GET with query param
-                response = await apiClient.get(str(abpapi_url))
+                response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
                 response.raise_for_status()
                 
                 # Convert to JSON/dict
@@ -788,3 +792,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# @app.post("/convert/vti-to-seg")
+# async def convert_vti_to_seg(
+#     study_uid: str = Form(...),
+#     series_uid: str = Form(...),
+#     segment_label: str = Form("Segment"),
+#     vti_file: UploadFile = Form(...)
+# ):
+#     temp_dir = Path("temp")
+#     temp_dir.mkdir(exist_ok=True)
+
+#     # Save incoming VTI
+#     vti_path = temp_dir / f"{series_uid}.vti"
+#     with open(vti_path, "wb") as f:
+#         f.write(await vti_file.read())
+
+#     # Create descriptor JSON for DCMQI
+#     descriptor = {
+#         "ContentCreatorName": "VolView",
+#         "BodyPartExamined": "UNKNOWN",
+#         "SeriesDescription": "Segmentation",
+#         "SegmentAlgorithmType": "SEMIAUTOMATIC",
+#         "SegmentAlgorithmName": "VolView-Seg",
+#         "Segments": [
+#             {
+#                 "SegmentNumber": 1,
+#                 "SegmentLabel": segment_label,
+#                 "SegmentAlgorithmType": "SEMIAUTOMATIC",
+#                 "SegmentAlgorithmName": "VolView-Seg",
+#                 "RecommendedDisplayCIELabValue": [128, 128, 64]
+#             }
+#         ]
+#     }
+
+#     descriptor_path = temp_dir / f"{series_uid}.json"
+#     with open(descriptor_path, "w") as f:
+#         json.dump(descriptor, f, indent=2)
+
+#     seg_path = temp_dir / f"{series_uid}_seg.dcm"
+
+#     # Run DCMQI converter
+#     cmd = [
+#         "itkimage2segimage",
+#         "--inputImageList", str(vti_path),
+#         "--inputDICOMDirectory", ".",  # Only needed if using source images
+#         "--outputDICOM", str(seg_path),
+#         "--segmentMetadata", str(descriptor_path),
+#         "--studyInstanceUID", study_uid,
+#         "--seriesInstanceUID", series_uid,
+#         "--skipEmptySlices"
+#     ]
+
+#     subprocess.run(cmd, check=True)
+
+#     # Return the DICOM-SEG file
+#     return FileResponse(
+#         seg_path,
+#         media_type="application/dicom",
+#         filename=f"{series_uid}_seg.dcm"
+#     )

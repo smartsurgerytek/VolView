@@ -18,16 +18,15 @@ import pydicom
 from PIL import Image
 import base64
 
-from .models import Manifest
+from models import Manifest
 # from conversion import settings
-from . import settings
-from .sr_generator import SRGenerator 
-
+import settings
+from sr_generator import SRGenerator
 import vtk # 匯入 vtk
 from vtk.util import numpy_support
 
 from datetime import datetime
-from .utils1 import (
+from utils1 import (
     DotDict,
     get_filepath_for_subject,
     read_file_from_zip,
@@ -38,7 +37,7 @@ from .utils1 import (
     update_private_tags
 )
 
-from .utils2 import (
+from utils2 import (
     Rulers,
     Tools,
     Layout,
@@ -51,8 +50,14 @@ from .utils2 import (
 
 from dicomweb_client.api import DICOMwebClient
 
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.responses import FileResponse
+from pathlib import Path
+import subprocess
+import json
+
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL #"https://idental-orthanc-int-449134413394.asia-east1.run.app/dicom-web"
+dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
 client = DICOMwebClient(url=dicomweb_url)
 
 # volview = VolViewApi()
@@ -66,7 +71,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.http_client.aclose()
-    
+
 @app.post("/api/save")  
 async def save_session_to_sr_and_seg(request: Request):
     try:
@@ -77,16 +82,16 @@ async def save_session_to_sr_and_seg(request: Request):
 
         if not zip_data:
             raise ValueError("No zip data received in the request body")
-        
+
         # get manifest
         zip_file_in_memory = io.BytesIO(zip_data)
         manifest_string = read_file_from_zip(zip_file_in_memory, "manifest.json")
         manifest = DotDict.from_dict(json.loads(manifest_string))
         print("Successfully read manifest.json from zip")
-        
+
         # get any subject dicom file to get study_instance_uid
         study_instance_uid = ''
-        
+
         path_value = list(manifest['datasetFilePath'].values())[0]
         subject = read_file_from_zip(zip_file_in_memory,path_value)
 
@@ -118,11 +123,11 @@ async def save_session_to_sr_and_seg(request: Request):
             print('filepath:', filepath)
 
             subject_ds = pydicom.dcmread(io.BytesIO(read_file_from_zip(zip_file_in_memory, filepath)))
-        
+
             for measurement in measurements:
                 if subject['id'] != measurement['imageID']:
                     continue
-                
+
                 # get measurement data
                 print('start process measurement id:',measurement['id'])
                 print(measurement)
@@ -148,7 +153,7 @@ async def save_session_to_sr_and_seg(request: Request):
                 content={'success': True},  
                 status_code=200
             )
-          
+
     except Exception as e:  
         print(f"Error saving session: {e}")  
         return JSONResponse(  
@@ -166,7 +171,7 @@ async def load_session(request: Request):
         # Validate input : StudyInstanceUID
         if not study_instance_uid:
             raise ValueError("StudyInstanceUID is required in the request body")
-        
+
         print(f"StudyInstanceUID: {study_instance_uid}")
 
         # Get all instances in the study
@@ -176,7 +181,7 @@ async def load_session(request: Request):
 
         if len(instances) == 0:
             raise ValueError(f"No instances found for StudyInstanceUID: {study_instance_uid}")
-        
+
         print(f"Found {len(instances)} instances in the study.")
         dataset_uids = []
         subject_files = {}
@@ -187,11 +192,11 @@ async def load_session(request: Request):
                 series_instance_uid=instance.get('0020000E')['Value'][0],
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
-                
+
             # simulate datasetid
             datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
             dataset_uids.append(datasetId)
-            
+
             subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
             subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
             print('subject_files:', subject_files)
@@ -218,14 +223,14 @@ async def load_session(request: Request):
                 parentToLayers=[],
                 primarySelection=dataset_uids[-1]
             )
-        
+
         # Save
         session_zip_bytes = create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
             client=client)
-        
+
         print(f"Session ZIP size: {len(session_zip_bytes)} bytes")
 
         return Response(content=session_zip_bytes, media_type="application/zip")
@@ -244,7 +249,7 @@ async def load_session_with_anno(request: Request):
         # Validate input : StudyInstanceUID
         if not study_instance_uid:
             raise ValueError("StudyInstanceUID is required in the request body")
-        
+
         print(f"StudyInstanceUID: {study_instance_uid}")
 
         # Get all instances in the study
@@ -254,7 +259,7 @@ async def load_session_with_anno(request: Request):
 
         if len(instances) == 0:
             raise ValueError(f"No instances found for StudyInstanceUID: {study_instance_uid}")
-        
+
         print(f"Found {len(instances)} instances in the study.")
         dataset_uids = []
         subject_files = {}
@@ -266,7 +271,7 @@ async def load_session_with_anno(request: Request):
                 series_instance_uid=instance.get('0020000E')['Value'][0],
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
-                
+
             # print('======================')
             # print(ds.get('SOPInstanceUID'))
             # print(ds.get('Modality'))
@@ -279,12 +284,12 @@ async def load_session_with_anno(request: Request):
                 datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
                 dataset_uids.append(datasetId)
                 # print('datasetId:', datasetId)
-                
+
                 subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
                 subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
-                
+
                 # print('subject_files:', subject_files)
-                
+
             # we are assuming only one SR in the study, and it contains the manifest
             elif ds.get('Modality') == 'SR':
                 print('Found SR instance:', ds.get('SOPInstanceUID'))
@@ -292,22 +297,20 @@ async def load_session_with_anno(request: Request):
                 # raw = ds[(0x0043, 0x1010)].value
                 # Decompress + decode to text
                 # manifest_text = gzip.decompress(raw).decode("utf-8")                
-        
+
                 # fetch manifest from api host's api
-                print('===================================================')
-                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"                
+                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}" #"https://localhost:44373/api/app/annotation/manifest"
                 print(str(abpapi_url))
                 # Send GET with query param
-                response = await apiClient.get(str(abpapi_url))
-                # response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
+                response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
                 response.raise_for_status()
-                
+
                 # Convert to JSON/dict
                 viewer_session = ViewerSession(**response.json())
                 is_manifest_from_sr = True
 
         generated_datasets, generated_sources, generated_paths = generate_data_structure(dataset_uids, subject_files)
-        
+
         # if no SR found
         if not viewer_session:
             print("No SR found in the study. Creating empty viewer session.")
@@ -334,7 +337,7 @@ async def load_session_with_anno(request: Request):
                 primarySelection=dataset_uids[-1]
             )
             is_manifest_from_sr = False
-                
+
         # Save
         session_zip_bytes = create_volview_zip_from_memory(
             viewer_session=viewer_session,
@@ -342,11 +345,11 @@ async def load_session_with_anno(request: Request):
             subject_files=subject_files,
             client=client,
             is_manifest_from_sr=is_manifest_from_sr)
-        
+
         print(f"Session ZIP size: {len(session_zip_bytes)} bytes")
 
         return Response(content=session_zip_bytes, media_type="application/zip")
-    
+
     except Exception as e:
         print(f"Error loading session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -362,7 +365,7 @@ async def get_series_uid():
 
 
 # TODO:read ORTHANC_BASE_URL from .env
-ORTHANC_BASE_URL = "https://idental-orthanc-int-449134413394.asia-east1.run.app"
+ORTHANC_BASE_URL = "http://localhost:8080"
 
 async def delete_orthanc_series(
     patient_id: str, 
@@ -374,24 +377,22 @@ async def delete_orthanc_series(
     
     此函式會根據 PatientID, StudyInstanceUID, 和 SeriesInstanceUID
     計算出 Orthanc 的 SHA-1 ID (Stable Identifier)，然後才發送請求。
-
     Args:
         patient_id (str): DICOM Tag (0010,0020) 的值
         study_instance_uid (str): DICOM Tag (0020,000D) 的值
         series_instance_uid (str): DICOM Tag (0020,000E) 的值
-
     Returns:
         一個包含請求結果的字典。
     """
-    
+
     orthanc_id = None # 先初始化
-    
+
     try:
         # --- 1. 計算 Orthanc SHA-1 ID ---
         # 根據規則：SHA-1(PatientID + StudyInstanceUID + SeriesInstanceUID)
         # 確保字串串接順序和內容完全正確
         concatenated_string = f"{patient_id}|{study_instance_uid}|{series_instance_uid}"
-        
+
         # 將字串編碼為 bytes (SHA-1 必須作用在 bytes 上)
         concatenated_bytes = concatenated_string.encode('utf-8')
         sha1_hash_obj = hashlib.sha1(concatenated_bytes)
@@ -402,14 +403,14 @@ async def delete_orthanc_series(
         orthanc_id = "-".join(parts)
         # 建立 SHA-1 hash 物件
         #sha1_hash_obj = hashlib.sha1(concatenated_bytes)
-        
+
         # 取得 16 進位字串 (這就是 Orthanc ID)
         #orthanc_id = sha1_hash_obj.hexdigest()
         # --- ------------------------ ---
 
         # 2. 組合完整的 API 網址 (使用計算出來的 hash ID)
         url = f"{ORTHANC_BASE_URL}/series/{orthanc_id}"
-        
+
         # 3. 發送請求
         async with httpx.AsyncClient() as client:
             print(f"--- 準備刪除 Series ---")
@@ -418,9 +419,9 @@ async def delete_orthanc_series(
             print(f"SeriesInstanceUID: {series_instance_uid}")
             print(f"Calculated Orthanc ID (SHA-1): {orthanc_id}")
             print(f"正在發送 DELETE 請求至: {url}")
-            
+
             response = await client.delete(url)
-            
+
             # 檢查 HTTP 狀態碼
             response.raise_for_status()
 
@@ -431,7 +432,7 @@ async def delete_orthanc_series(
             except json.JSONDecodeError:
                 # 如果 Orthanc 回傳的是空內容或純文字
                 response_data = response.text
-                
+
             print(f"成功刪除 Series (狀態碼: {response.status_code})")
             return {
                 "success": True,
@@ -504,7 +505,7 @@ async def get_segmentation(request: Request):
 
         if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
             raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
-        
+
         # ##### TODO: only for testing
         # debug_filename = "debug_segmentation_response_output.txt"
         # with open(debug_filename, "w", encoding="utf-8") as f:
@@ -540,7 +541,7 @@ def get_base64_string(ds):
     final_image.save(buffered, format="PNG")
 
     base64_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    
+
     return base64_string
 
 async def get_dentistry_segmentation(base64_string: str):
@@ -553,19 +554,19 @@ async def get_dentistry_segmentation(base64_string: str):
     query_params = {
         "key": "apikey"
         }
-    
+
     timeout_config = httpx.Timeout(30.0, connect=5.0)
 
     async with httpx.AsyncClient(timeout=timeout_config) as client:
         try:
             print(f"--- ready to invoke Inference API: {url} ---")
-            
+
             response = await client.post(
                 url,
                 json=payload,
                 params=query_params
             )
-            
+
             response.raise_for_status()
 
             response_data = response.json()
@@ -591,19 +592,19 @@ def get_vti_file(instance, segmentation_response):
         pixel_spacing = [1.0, 1.0] ## instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0]
         slice_thickness = float(instance.SliceThickness if "SliceThickness" in instance else 1.0)
         origin = instance.ImagePositionPatient if "ImagePositionPatient" in instance else [0.0, 0.0, 0.0]
-        
+
         # 4. 建立畫布
         # *** 假設: class ID 範圍為 0-255 (uint8) ***
         final_mask = np.zeros((H, W), dtype=np.uint8)
-        
+
         # 5. 解碼 RLE 並合成 Mask
         # *** 假設: API 回應的結構如同您的範例 ***
         # (您可能需要根據您的 API 回應調整 'yolo_results' 和 'yolov8_contents')
         if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
             raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
-                    
+
         yolov8_contents = segmentation_response['yolo_results']['yolov8_contents']
-            
+
         print(f"Processing {len(yolov8_contents)} segmented objects...")
 
         for obj in yolov8_contents:
@@ -615,13 +616,13 @@ def get_vti_file(instance, segmentation_response):
 
             # 1. 解碼 RLE
             bbox_mask, x1, y1, x2, y2 = rle2Mask(points)
-                
+
             if bbox_mask.size == 0:
                 print(f"Skipping empty mask for class {class_id}")
                 continue
 
             # 2. 尋找 來源 (bbox_mask) 和 目標 (final_mask) 之間的重疊區域
-            
+
             # --- 2a. 計算重疊區域的「全域座標」(相對於 final_mask) ---
             # BBox 的 x2, y2 是包含在內的，所以結束點要 +1
             x_start_global = max(x1, 0)
@@ -641,11 +642,11 @@ def get_vti_file(instance, segmentation_response):
             y_end_local = y_end_global - y1
 
             # 3. 根據計算好的範圍，從 來源(src) 裁切並貼到 目標(dest)
-            
+
             # 取得 來源(bbox_mask) 中要被複製的區域
             src_slice = (slice(y_start_local, y_end_local), slice(x_start_local, x_end_local))
             mask_to_paste = bbox_mask[src_slice]
-            
+
             # 取得 目標(final_mask) 中要被貼上的區域
             dest_slice = (slice(y_start_global, y_end_global), slice(x_start_global, x_end_global))
             paste_region = final_mask[dest_slice]
@@ -654,7 +655,7 @@ def get_vti_file(instance, segmentation_response):
             # 只在 mask_to_paste 為 1 (前景) 的地方貼上
             valid_paste_mask = (mask_to_paste == 1)
             paste_region[valid_paste_mask] = class_id + 1 # 使用 class_id + 1
-            
+
         # 6. 轉換為 VTI (使用 VTK)
         print("Converting final mask to VTI...")
 
@@ -671,7 +672,7 @@ def get_vti_file(instance, segmentation_response):
             deep=True,
             array_type=vtk.VTK_UNSIGNED_CHAR # 對應 np.uint8
         )
-            
+
         # 6.3. 將資料設定到 vtkImageData
         image_data.GetPointData().SetScalars(vtk_data_array)
 
@@ -681,22 +682,22 @@ def get_vti_file(instance, segmentation_response):
         writer.SetInputData(image_data)
         writer.WriteToOutputStringOn()
         writer.Write()
-        
+
         # 取得位元組資料
         vti_content_bytes = writer.GetOutputString()
 
         # 7. 回傳 VTI 檔案
         print("Sending .vti file as response.")
-        
+
         # ##### TODO: only for testing
         # debug_filename = "debug_vti_response_output.vti"
         # with open(debug_filename, "w", encoding="utf-8") as f:
         #     f.write(vti_content_bytes)
         # print(f"--- debug_vti_response_output 已儲存到 {debug_filename} 供除錯 ---")
         # #####
-        
+
         return vti_content_bytes
-        
+
     except Exception as e:
         print(f"Error getting segmentation: {e}")
         import traceback
@@ -718,30 +719,30 @@ def rle2Mask(rle: list) -> tuple[np.ndarray, int, int, int, int]:
     x1, y1, x2, y2 = map(int, bbox_coords)
 
     rle_int_list_filter = list(map(int, rle_counts))
-    
+
     width, height = x2 - x1 + 1, y2 - y1 + 1
-    
+
     if width <= 0 or height <= 0:
         return np.zeros((0, 0), dtype=np.uint8), x1, y1, x2, y2
-        
+
     total_pixels = width * height
     decoded = np.zeros(total_pixels, dtype=np.uint8)
     idx = 0
     val = 0
-    
+
     try:
         for count in rle_int_list_filter:
             end_idx = idx + count
             if end_idx > total_pixels:
-                
+
                 decoded[idx:] = val
                 print(f"Warning: RLE data mismatch. Truncating.")
                 break
-                
+
             decoded[idx:end_idx] = val
             idx = end_idx
             val = 1 - val
-            
+
         decoded_mask = decoded.reshape((width, height), order='F').T
         return decoded_mask, x1, y1, x2, y2
 
@@ -770,7 +771,7 @@ async def manifest_to_dicom_sr(manifest: Manifest):
 async def dicom_sr_to_manifest(request: Request):
     dicom_bytes = await request.body()
     ds = pydicom.dcmread(io.BytesIO(dicom_bytes))
-    
+
     # Extract the compressed manifest
     raw = ds[(0x0043, 0x1010)].value
     # Decompress + decode to text
@@ -789,3 +790,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# @app.post("/convert/vti-to-seg")
+# async def convert_vti_to_seg(
+#     study_uid: str = Form(...),
+#     series_uid: str = Form(...),
+#     segment_label: str = Form("Segment"),
+#     vti_file: UploadFile = Form(...)
+# ):
+#     temp_dir = Path("temp")
+#     temp_dir.mkdir(exist_ok=True)
+
+#     # Save incoming VTI
+#     vti_path = temp_dir / f"{series_uid}.vti"
+#     with open(vti_path, "wb") as f:
+#         f.write(await vti_file.read())
+
+#     # Create descriptor JSON for DCMQI
+#     descriptor = {
+#         "ContentCreatorName": "VolView",
+#         "BodyPartExamined": "UNKNOWN",
+#         "SeriesDescription": "Segmentation",
+#         "SegmentAlgorithmType": "SEMIAUTOMATIC",
+#         "SegmentAlgorithmName": "VolView-Seg",
+#         "Segments": [
+#             {
+#                 "SegmentNumber": 1,
+#                 "SegmentLabel": segment_label,
+#                 "SegmentAlgorithmType": "SEMIAUTOMATIC",
+#                 "SegmentAlgorithmName": "VolView-Seg",
+#                 "RecommendedDisplayCIELabValue": [128, 128, 64]
+#             }
+#         ]
+#     }
+
+#     descriptor_path = temp_dir / f"{series_uid}.json"
+#     with open(descriptor_path, "w") as f:
+#         json.dump(descriptor, f, indent=2)
+
+#     seg_path = temp_dir / f"{series_uid}_seg.dcm"
+
+#     # Run DCMQI converter
+#     cmd = [
+#         "itkimage2segimage",
+#         "--inputImageList", str(vti_path),
+#         "--inputDICOMDirectory", ".",  # Only needed if using source images
+#         "--outputDICOM", str(seg_path),
+#         "--segmentMetadata", str(descriptor_path),
+#         "--studyInstanceUID", study_uid,
+#         "--seriesInstanceUID", series_uid,
+#         "--skipEmptySlices"
+#     ]
+
+#     subprocess.run(cmd, check=True)
+
+#     # Return the DICOM-SEG file
+#     return FileResponse(
+#         seg_path,
+#         media_type="application/dicom",
+#         filename=f"{series_uid}_seg.dcm"
+#     )

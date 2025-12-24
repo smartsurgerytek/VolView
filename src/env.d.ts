@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_HIDE_DICOM_WEB: string;
   readonly VITE_FASTAPI_URL:string;
   readonly VITE_FOUNDATION_API:string;
+  readonly VITE_FOUNDATION_WEB:string;
 }
 
 interface ImportMeta {

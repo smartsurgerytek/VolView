@@ -57,14 +57,9 @@ import subprocess
 import json
 
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
-session = httpx.Client(auth=("admin", "@+(fHbBSkj"))
 
-# 2. Pass the session to the DICOMwebClient
-client = DICOMwebClient(
-    url=dicomweb_url,
-    session=session
-)
+dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
+client = DICOMwebClient(url=dicomweb_url)
 
 # volview = VolViewApi()
 

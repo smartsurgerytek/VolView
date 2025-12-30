@@ -52,14 +52,8 @@ from .utils2 import (
 from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL
-session = httpx.Client(auth=("admin", "@+(fHbBSkj"))
-
-client = DICOMwebClient(
-    url=dicomweb_url,
-    session=session
-)
-
+dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
+client = DICOMwebClient(url=dicomweb_url)
 # volview = VolViewApi()
 
 app = FastAPI()

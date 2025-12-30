@@ -8,7 +8,6 @@ on:
 env:
   PROJECT_ID: direct-hope-479409-c5
   REGION: asia-east1
-  DOTNET_VERSION: 9.0
   SERVICE_ACCOUNT: sa-for-idental-deployer@direct-hope-479409-c5.iam.gserviceaccount.com
   VPC_CONNECTOR: vpc-connector-int
 
@@ -27,15 +26,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------
-      # Checkout
-      # --------------------------
+      # 1. Checkout local code from the current branch
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # --------------------------
-      # Authenticate with GCP
-      # --------------------------
+      # 2. Authenticate with GCP
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -46,11 +41,11 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      # Docker auth for Artifact Registry
+      # 3. Docker auth for Artifact Registry
       - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
 
-      # Cleanup disk space (VolView builds are heavy)
+      # 4. Cleanup disk space
       - name: Free up disk space
         run: |
           echo "Cleaning up Docker and system caches..."
@@ -59,15 +54,12 @@ jobs:
           sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
           df -h
 
-      # --------------------------
-      # VolView Frontend
-      # --------------------------
+      # 5. VolView Frontend Build & Deploy
       - name: Build and Push VolView Frontend
         run: |
           docker build \
             --target frontend \
             --no-cache \
-            --build-arg CACHEBUST=${{ github.run_id }} \
             --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
             --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
             --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
@@ -87,15 +79,12 @@ jobs:
             --memory=1Gi \
             --cpu=1
 
-      # --------------------------
-      # VolView Backend
-      # --------------------------
+      # 6. VolView Backend Build & Deploy
       - name: Build and Push VolView Backend
         run: |
           docker build \
             --target backend \
             --no-cache \
-            --build-arg CACHEBUST=${{ github.run_id }} \
             -f Dockerfile.Integration \
             -t ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest .
           docker push ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest

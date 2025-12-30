@@ -1,0 +1,114 @@
+name: Deploy Idental Services (Cloud Run - Integration)
+
+on:  
+  push:
+    branches:
+      - 'test-record-page-devops-build'
+
+env:
+  PROJECT_ID: direct-hope-479409-c5
+  REGION: asia-east1
+  DOTNET_VERSION: 9.0
+  SERVICE_ACCOUNT: sa-for-idental-deployer@direct-hope-479409-c5.iam.gserviceaccount.com
+  VPC_CONNECTOR: vpc-connector-int
+
+  # Docker images  
+  DOCKER_IMAGE_VOLVIEW_FRONTEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-frontend
+  DOCKER_IMAGE_VOLVIEW_BACKEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-backend
+
+  # Build Args for VolView Frontend
+  VV_FOUNDATION_API: https://idental-httpapi-host-int-449134413394.asia-east1.run.app/api/volview
+  VV_FASTAPI_URL: https://volview-backend-int-449134413394.asia-east1.run.app/api
+  VV_DICOMWEB_URL: https://idental-httpapi-host-int-449134413394.asia-east1.run.app/dicom-web  
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Volview (Integration)
+    runs-on: ubuntu-latest
+
+    steps:
+      # --------------------------
+      # Checkout
+      # --------------------------
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # --------------------------
+      # Authenticate with GCP
+      # --------------------------
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # Docker auth for Artifact Registry
+      - name: Docker auth for Artifact Registry
+        run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
+
+      # Cleanup disk space (VolView builds are heavy)
+      - name: Free up disk space
+        run: |
+          echo "Cleaning up Docker and system caches..."
+          docker system prune -af || true
+          docker volume prune -f || true
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
+          df -h
+
+      # --------------------------
+      # VolView Frontend
+      # --------------------------
+      - name: Build and Push VolView Frontend
+        run: |
+          docker build \
+            --target frontend \
+            --no-cache \
+            --build-arg CACHEBUST=${{ github.run_id }} \
+            --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
+            --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
+            --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
+            -f Dockerfile.Integration \
+            -t ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest .
+          docker push ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest
+
+      - name: Deploy VolView Frontend to Cloud Run
+        run: |
+          gcloud run deploy volview-frontend-int \
+            --image=${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest \
+            --platform=managed \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --service-account=${{ env.SERVICE_ACCOUNT }} \
+            --port=80 \
+            --memory=1Gi \
+            --cpu=1
+
+      # --------------------------
+      # VolView Backend
+      # --------------------------
+      - name: Build and Push VolView Backend
+        run: |
+          docker build \
+            --target backend \
+            --no-cache \
+            --build-arg CACHEBUST=${{ github.run_id }} \
+            -f Dockerfile.Integration \
+            -t ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest .
+          docker push ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest
+
+      - name: Deploy VolView Backend to Cloud Run
+        run: |
+          gcloud run deploy volview-backend-int \
+            --image=${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest \
+            --platform=managed \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --service-account=${{ env.SERVICE_ACCOUNT }} \
+            --vpc-connector=${{ env.VPC_CONNECTOR }} \
+            --port=4014 \
+            --memory=1Gi \
+            --cpu=1

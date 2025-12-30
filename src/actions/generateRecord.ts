@@ -4,6 +4,8 @@ import { useDICOMStore } from '../store/datasets-dicom';
 export async function generateRecord(selectedDicomIds: string[]) {  
     const { VITE_FOUNDATION_WEB } = import.meta.env;
 
+    console.log("=========================Calling generateRecord=========================");
+
     console.log("DEBUG: Sending Record to Parent Origin:", VITE_FOUNDATION_WEB);
     console.log("DEBUG: Selected IDs:", selectedDicomIds);
 

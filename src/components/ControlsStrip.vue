@@ -122,6 +122,7 @@ const imageSelectionStore = useImageSelectionStore();
 const { selectedImageIDs: selected } = storeToRefs(imageSelectionStore);
 
 function handleGenerateRecord() {
+  console.log("===============================================Calling handleGenerateRecord==============")
   generateRecord(selected.value);
 }
 

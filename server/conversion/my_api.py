@@ -52,7 +52,7 @@ from .utils2 import (
 from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL #"https://idental-orthanc-int-449134413394.asia-east1.run.app/dicom-web"
+dicomweb_url = settings.DICOMWEB_URL
 client = DICOMwebClient(url=dicomweb_url)
 
 # volview = VolViewApi()

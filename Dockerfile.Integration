@@ -38,7 +38,7 @@ RUN poetry lock && poetry install --with dev
 FROM nginx:1.27-alpine AS frontend
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 # This now works because the files are in the local build context
-COPY ./etc/docker-compose/volview/nginx.Integration.conf /etc/nginx/conf.d/default.conf
+COPY ./nginx.Integration.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 # ---- Backend runtime ----

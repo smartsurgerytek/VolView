@@ -362,7 +362,11 @@ async def get_series_uid():
 
 
 # TODO:read ORTHANC_BASE_URL from .env
-ORTHANC_BASE_URL = "https://idental-orthanc-int-449134413394.asia-east1.run.app"
+# We take the DICOMWEB_URL from our settings (which switches between local/cloud)
+# and remove the "/dicom-web" part to get the base Orthanc administrative URL.
+ORTHANC_BASE_URL = settings.DICOMWEB_URL.replace("/dicom-web", "")
+
+print(f"======DEBUG: Dynamic ORTHANC_BASE_URL is set to======: {ORTHANC_BASE_URL}")
 
 async def delete_orthanc_series(
     patient_id: str, 

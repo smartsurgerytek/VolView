@@ -58,7 +58,8 @@ import json
 
 # # TODO: url should be configured
 dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
-client = DICOMwebClient(url=dicomweb_url)
+client = DICOMwebClient(url=dicomweb_url,username="admin",
+    password="@+(fHbBSkj")
 
 # volview = VolViewApi()
 

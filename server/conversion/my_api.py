@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from httpx import BasicAuth
+import httpx
 import hashlib
 import zipfile
 import json
@@ -53,9 +53,11 @@ from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
 dicomweb_url = settings.DICOMWEB_URL
+session = httpx.Client(auth=("admin", "@+(fHbBSkj"))
+
 client = DICOMwebClient(
     url=dicomweb_url,
-    auth=BasicAuth("admin", "@+(fHbBSkj")
+    session=session
 )
 
 # volview = VolViewApi()

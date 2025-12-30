@@ -55,7 +55,7 @@ from dicomweb_client.api import DICOMwebClient
 dicomweb_url = settings.DICOMWEB_URL
 client = DICOMwebClient(
     url=dicomweb_url,
-    authentication=BasicAuth("admin", "@+(fHbBSkj")
+    auth=BasicAuth("admin", "@+(fHbBSkj")
 )
 
 # volview = VolViewApi()

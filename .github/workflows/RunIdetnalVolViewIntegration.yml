@@ -63,9 +63,10 @@ jobs:
             --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
             --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
             --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
+            --build-arg FOUNDATION_WEB=https://idental-blazor-int-449134413394.asia-east1.run.app \
             -f Dockerfile.Integration \
             -t ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest .
-          docker push ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest
+          
 
       - name: Deploy VolView Frontend to Cloud Run
         run: |

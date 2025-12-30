@@ -9,6 +9,7 @@ ARG DICOMWEB_URL
 ARG FOUNDATION_API
 ARG FASTAPI_URL
 ARG FOUNDATION_APPSERVICE
+ARG FOUNDATION_WEB
 
 # NEW STEP: Rename your template so Vite mode 'integration' can find it
 RUN cp .env.example.Integration .env.integration
@@ -18,6 +19,7 @@ ENV VITE_DICOM_WEB_URL=$DICOMWEB_URL
 ENV VITE_FOUNDATION_API=$FOUNDATION_API
 ENV VITE_FOUNDATION_APPSERVICE=$FOUNDATION_APPSERVICE
 ENV VITE_FASTAPI_URL=$FASTAPI_URL
+ENV VITE_FOUNDATION_WEB=$FOUNDATION_WEB
 
 RUN npm ci
 RUN sed -i 's/"build": "vue-tsc --noEmit && vite build"/"build": "vite build"/' package.json

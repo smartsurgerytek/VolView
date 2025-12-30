@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-import httpx
+from httpx import BasicAuth
 import hashlib
 import zipfile
 import json

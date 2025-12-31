@@ -1,4 +1,5 @@
 import gzip
+import os
 from pathlib import Path
 from typing import Dict
 from fastapi import Depends, FastAPI, Request, HTTPException, Response

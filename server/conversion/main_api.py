@@ -58,8 +58,14 @@ import json
 
 # # TODO: url should be configured
 
-dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
-client = DICOMwebClient(url=dicomweb_url)
+dicomweb_url = settings.DICOMWEB_URL
+session = httpx.Client(auth=("admin", "iDentalOrth123"))
+
+# 2. Pass the session to the DICOMwebClient
+client = DICOMwebClient(
+    url=dicomweb_url,
+    session=session
+)
 
 # volview = VolViewApi()
 

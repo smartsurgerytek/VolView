@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout code 
         uses: actions/checkout@v3
 
       - name: Authenticate with Google Cloud
@@ -95,7 +95,7 @@ jobs:
             --allow-unauthenticated \
             --service-account=${{ env.SERVICE_ACCOUNT }} \
             --vpc-connector=${{ env.VPC_CONNECTOR }} \
-            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123" \
+            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123,DIRECT_ORTHANC_URL=https://idental-orthanc-int-449134413394.asia-east1.run.app" \
             --port=4014 \
             --memory=1Gi \
             --cpu=1            

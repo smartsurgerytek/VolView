@@ -54,9 +54,12 @@ from dicomweb_client.api import DICOMwebClient
 # # TODO: url should be configured
 
 dicomweb_url = settings.DICOMWEB_URL
-session = httpx.Client(auth=("admin", "iDentalOrth123"))
 
-# 2. Pass the session to the DICOMwebClient
+orthanc_user = os.getenv("ORTHANC_USERNAME", "admin")
+orthanc_pass = os.getenv("ORTHANC_PASSWORD", "iDentalOrth123")
+
+session = httpx.Client(auth=(orthanc_user, orthanc_pass))
+
 client = DICOMwebClient(
     url=dicomweb_url,
     session=session

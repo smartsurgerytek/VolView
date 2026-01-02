@@ -378,7 +378,7 @@ async def get_series_uid():
 # and remove the "/dicom-web" part to get the base Orthanc administrative URL.
 
 
-ORTHANC_BASE_URL = os.getenv("DIRECT_ORTHANC_URL", "https://idental-orthanc-int-449134413394.asia-east1.run.app")
+ORTHANC_BASE_URL = os.getenv("DIRECT_ORTHANC_URL", "https://dicom-pacs-int.smartsurgerytek.net")
 
 async def delete_orthanc_series(
     patient_id: str, 

@@ -16,10 +16,10 @@ env:
   DOCKER_IMAGE_VOLVIEW_BACKEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-backend
 
   # Build Args for VolView Frontend
-  VV_FOUNDATION_API: https://idental-httpapi-host-int-449134413394.asia-east1.run.app/api/volview
-  VV_FASTAPI_URL: https://volview-backend-int-449134413394.asia-east1.run.app/api
-  VV_DICOMWEB_URL: https://idental-httpapi-host-int-449134413394.asia-east1.run.app/dicom-web  
-  VV_FOUNDATION_WEB: https://idental-blazor-int-449134413394.asia-east1.run.app
+  VV_FOUNDATION_API: https://dicom-api-int.smartsurgerytek.net/api/volview
+  VV_FASTAPI_URL: https://dicom-viewer-api-int.smartsurgerytek.net/api
+  VV_DICOMWEB_URL: https://dicom-api-int.smartsurgerytek.net/dicom-web  
+  VV_FOUNDATION_WEB: https://dicom-app-int.smartsurgerytek.net
 
 jobs:
   build-and-deploy:
@@ -95,7 +95,7 @@ jobs:
             --allow-unauthenticated \
             --service-account=${{ env.SERVICE_ACCOUNT }} \
             --vpc-connector=${{ env.VPC_CONNECTOR }} \
-            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123,DIRECT_ORTHANC_URL=https://idental-orthanc-int-449134413394.asia-east1.run.app" \
+            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123,DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
             --port=4014 \
             --memory=1Gi \
             --cpu=1            

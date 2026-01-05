@@ -1,9 +1,7 @@
 name: Deploy Idental Services (Cloud Run - Integration)
 
 on:  
-  push:
-    branches:
-      - 'test-record-page-devops-build'
+  workflow_dispatch:
 
 env:
   PROJECT_ID: direct-hope-479409-c5
@@ -42,6 +40,13 @@ jobs:
 
       - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
+
+      # Run Unit Tests
+      - name: Run Unit Tests
+        run: |
+          dotnet restore
+          dotnet build --no-restore
+          dotnet test --no-build --verbosity normal        
 
       - name: Free up disk space
         run: |
@@ -98,4 +103,4 @@ jobs:
             --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123,DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
             --port=4014 \
             --memory=1Gi \
-            --cpu=1            
+            --cpu=1

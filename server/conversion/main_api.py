@@ -235,9 +235,8 @@ async def load_session(request: Request):
                 parentToLayers=[],
                 primarySelection=dataset_uids[-1]
             )
-
         # Save
-        session_zip_bytes = create_volview_zip_from_memory(
+        session_zip_bytes = await create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
@@ -284,35 +283,20 @@ async def load_session_with_anno(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
 
-            # print('======================')
-            # print(ds.get('SOPInstanceUID'))
-            # print(ds.get('Modality'))
-            # print(ds.get('ReferencedSOPInstanceUID'))
-
             # simulate datasetid
             if((ds.get('Modality') != 'SR') and (ds.get('Modality') != 'SEG')):
-                print('Found subject instance:', ds.get('SOPInstanceUID'))
-                # try to caculate datasetId
+                print("Image Instance Found")
                 datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
                 dataset_uids.append(datasetId)
-                # print('datasetId:', datasetId)
-
+                
                 subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
-                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
-
-                # print('subject_files:', subject_files)
-
+                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]                
+                
             # we are assuming only one SR in the study, and it contains the manifest
-            elif ds.get('Modality') == 'SR':
-                print('Found SR instance:', ds.get('SOPInstanceUID'))
-                # Extract the compressed manifest from private tag (0043,1010)
-                # raw = ds[(0x0043, 0x1010)].value
-                # Decompress + decode to text
-                # manifest_text = gzip.decompress(raw).decode("utf-8")                
-
+            elif ds.get('Modality') == 'SR':              
+        
                 # fetch manifest from api host's api
                 abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}" #"https://localhost:44373/api/app/annotation/manifest"
-                print(str(abpapi_url))
                 # Send GET with query param
                 response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
                 response.raise_for_status()
@@ -351,7 +335,7 @@ async def load_session_with_anno(request: Request):
             is_manifest_from_sr = False
 
         # Save
-        session_zip_bytes = create_volview_zip_from_memory(
+        session_zip_bytes = await create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
@@ -542,19 +526,19 @@ async def get_segmentation(request: Request):
 
 def get_base64_string(ds):
     new_image = ds.pixel_array.astype(float)
+    print("Original image shape:", new_image.shape)
 
     # Rescaling the image
     scaled_image = (np.maximum(new_image, 0) / new_image.max()) * 255.0
-
+    
     scaled_image = np.uint8(scaled_image)
     final_image = Image.fromarray(scaled_image)
-
+    
     # save
     buffered = io.BytesIO()
-    final_image.save(buffered, format="PNG")
+    final_image.save(buffered, format="JPEG")
 
     base64_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
     return base64_string
 
 async def get_dentistry_segmentation(base64_string: str):
@@ -584,7 +568,7 @@ async def get_dentistry_segmentation(base64_string: str):
 
             response_data = response.json()
             print(f"成功取得 API 回應 (狀態碼: {response.status_code})")
-            #print(response_data) # 印出 API 回傳的資料
+            # print(response_data) # 印出 API 回傳的資料
             return response_data
 
         except httpx.HTTPStatusError as e:
@@ -602,7 +586,7 @@ def get_vti_file(instance, segmentation_response):
         H, W = instance.Rows, instance.Columns
 
         ## afeter set PixelSpacing=[1.0, 1.0] brush works!
-        pixel_spacing = [1.0, 1.0] ## instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0]
+        pixel_spacing = instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0] #[1.0, 1.0]
         slice_thickness = float(instance.SliceThickness if "SliceThickness" in instance else 1.0)
         origin = instance.ImagePositionPatient if "ImagePositionPatient" in instance else [0.0, 0.0, 0.0]
 
@@ -615,21 +599,25 @@ def get_vti_file(instance, segmentation_response):
         # (您可能需要根據您的 API 回應調整 'yolo_results' 和 'yolov8_contents')
         if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
             raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
-
+        
+        class_names = segmentation_response['yolo_results']['class_names']
+        class_name_to_class_id = {v: k for k, v in class_names.items()}
+        
         yolov8_contents = segmentation_response['yolo_results']['yolov8_contents']
 
         print(f"Processing {len(yolov8_contents)} segmented objects...")
 
         for obj in yolov8_contents:
             points = obj.get('points')
-            class_id = obj.get('class_id') 
+            label = obj.get('label')
+            class_id =  int(class_name_to_class_id.get(label))
 
             if not points or class_id is None:
+                print("Skipping invalid object with missing points or class_id")
                 continue
 
             # 1. 解碼 RLE
             bbox_mask, x1, y1, x2, y2 = rle2Mask(points)
-
             if bbox_mask.size == 0:
                 print(f"Skipping empty mask for class {class_id}")
                 continue
@@ -642,6 +630,8 @@ def get_vti_file(instance, segmentation_response):
             y_start_global = max(y1, 0)
             x_end_global = min(x2 + 1, W) # W 是 final_mask 的寬度
             y_end_global = min(y2 + 1, H) # H 是 final_mask 的高度
+            
+            print(f"Class {class_id}: Global Overlap Region - X: [{x_start_global}, {x_end_global}), Y: [{y_start_global}, {y_end_global})")
 
             # --- 2b. 如果根本沒有重疊，就跳過 ---
             if x_start_global >= x_end_global or y_start_global >= y_end_global:
@@ -653,6 +643,8 @@ def get_vti_file(instance, segmentation_response):
             y_start_local = y_start_global - y1
             x_end_local = x_end_global - x1
             y_end_local = y_end_global - y1
+            
+            print(f"Class {class_id}: Local Overlap Region - X: [{x_start_local}, {x_end_local}), Y: [{y_start_local}, {y_end_local})")
 
             # 3. 根據計算好的範圍，從 來源(src) 裁切並貼到 目標(dest)
 
@@ -666,7 +658,7 @@ def get_vti_file(instance, segmentation_response):
 
             # 4. 執行貼上
             # 只在 mask_to_paste 為 1 (前景) 的地方貼上
-            valid_paste_mask = (mask_to_paste == 1)
+            valid_paste_mask = (mask_to_paste > 0)
             paste_region[valid_paste_mask] = class_id + 1 # 使用 class_id + 1
 
         # 6. 轉換為 VTI (使用 VTK)
@@ -674,12 +666,15 @@ def get_vti_file(instance, segmentation_response):
 
         # 6.1. 建立 vtkImageData
         image_data = vtk.vtkImageData()
+        print(f"VTI Image Dimensions: W={W}, H={H}")
         image_data.SetDimensions(W, H, 1) # VTK 順序: (X, Y, Z)
-        image_data.SetSpacing(float(pixel_spacing[1]), float(pixel_spacing[0]), slice_thickness) # (X, Y, Z) Spacing
+        # image_data.SetSpacing(float(pixel_spacing[0]), float(pixel_spacing[1]), slice_thickness) # (X, Y, Z) Spacing
+        image_data.SetSpacing(1, 1, slice_thickness) # (X, Y, Z) Spacing
         image_data.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2])) # (X, Y, Z) Origin
 
         # 6.2. 轉換 NumPy 陣列為 VTK 陣列
         # final_mask (H, W) -> ravel('C') -> (W*H,)
+
         vtk_data_array = numpy_support.numpy_to_vtk(
             num_array=final_mask.ravel(order='C'),
             deep=True,
@@ -701,7 +696,6 @@ def get_vti_file(instance, segmentation_response):
 
         # 7. 回傳 VTI 檔案
         print("Sending .vti file as response.")
-
         # ##### TODO: only for testing
         # debug_filename = "debug_vti_response_output.vti"
         # with open(debug_filename, "w", encoding="utf-8") as f:

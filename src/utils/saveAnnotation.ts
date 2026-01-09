@@ -3,10 +3,10 @@
 /* eslint-disable no-continue */
 /* eslint-disable no-restricted-syntax */
 
-import JSZip from "jszip";
-import dcmjs from "dcmjs";
-import * as dicomParser from "dicom-parser";
-import { get } from "http";
+import JSZip from 'jszip';
+import dcmjs from 'dcmjs';
+import * as dicomParser from 'dicom-parser';
+import { get } from 'http';
 
 export interface DicomImageInfo {
   sopInstanceUID: string;
@@ -18,7 +18,7 @@ export interface DicomImageInfo {
 }
 
 export interface ParsedAnnotation {
-  shape: "line" | "rectangle";
+  shape: 'line' | 'rectangle';
   sopInstanceUID: string;
   coordinates: number[]; // [x1,y1,x2,y2]
 }
@@ -34,9 +34,7 @@ export interface ZipParseResult {
 
 function distance3D(a: number[], b: number[]): number {
   return Math.sqrt(
-    (a[0] - b[0]) ** 2 +
-      (a[1] - b[1]) ** 2 +
-      (a[2] - b[2]) ** 2
+    (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
   );
 }
 
@@ -53,16 +51,22 @@ function pixelToPatient(
   const [rowSpacing, colSpacing] = pixelSpacing;
 
   return [
-    imagePosition[0] + row * rowSpacing * rowDir[0] + col * colSpacing * colDir[0],
-    imagePosition[1] + row * rowSpacing * rowDir[1] + col * colSpacing * colDir[1],
-    imagePosition[2] + row * rowSpacing * rowDir[2] + col * colSpacing * colDir[2],
+    imagePosition[0] +
+      row * rowSpacing * rowDir[0] +
+      col * colSpacing * colDir[0],
+    imagePosition[1] +
+      row * rowSpacing * rowDir[1] +
+      col * colSpacing * colDir[1],
+    imagePosition[2] +
+      row * rowSpacing * rowDir[2] +
+      col * colSpacing * colDir[2],
   ];
 }
 
 // keep: rectangle → polyline
 export function rectangleToPolyline(coords: number[]): [number, number][] {
   if (coords.length !== 4) {
-    throw new Error("Rectangle needs 4 coordinates: [x1,y1,x2,y2]");
+    throw new Error('Rectangle needs 4 coordinates: [x1,y1,x2,y2]');
   }
 
   const [x1, y1, x2, y2] = coords;
@@ -88,7 +92,12 @@ const { DicomMessage } = dcmjs.data;
 // ------------------------------------------------------------------
 type ManifestType = {
   datasets: { id: string; dataSourceId: number }[];
-  dataSources: { id: number; type: string; fileId?: number; sources?: number[] }[];
+  dataSources: {
+    id: number;
+    type: string;
+    fileId?: number;
+    sources?: number[];
+  }[];
   datasetFilePath: Record<string, string>;
 };
 
@@ -107,25 +116,27 @@ export function getSOPInstanceFromImageID(
   dicomToSopMap: Record<string, string>
 ): string | undefined {
   // 1. Find dataset by imageID (dataset.id === imageID)
-  const dataset = manifest.datasets.find(d => d.id === imageID);
+  const dataset = manifest.datasets.find((d) => d.id === imageID);
   if (!dataset) return undefined;
 
   const dataSourceId = dataset.dataSourceId;
 
   // 2. Find dataSource entry by its ID
-  const dataSource = manifest.dataSources.find(ds => ds.id === dataSourceId);
+  const dataSource = manifest.dataSources.find((ds) => ds.id === dataSourceId);
   if (!dataSource) return undefined;
 
   // Case A: collection → points to another dataSource
   let finalFileId: number | undefined = undefined;
 
-  if (dataSource.type === "collection") {
-    const src = manifest.dataSources.find(ds => ds.id === dataSource.sources?.[0]);
+  if (dataSource.type === 'collection') {
+    const src = manifest.dataSources.find(
+      (ds) => ds.id === dataSource.sources?.[0]
+    );
     finalFileId = src?.fileId;
   }
 
   // Case B: direct file entry
-  if (dataSource.type === "file") {
+  if (dataSource.type === 'file') {
     finalFileId = dataSource.fileId;
   }
 
@@ -145,10 +156,10 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
   // ------------------------------------------
   // 1. MANIFEST.JSON
   // ------------------------------------------
-  const manifestEntry = zip.file("manifest.json");
-  if (!manifestEntry) throw new Error("manifest.json not found in ZIP");
+  const manifestEntry = zip.file('manifest.json');
+  if (!manifestEntry) throw new Error('manifest.json not found in ZIP');
 
-  const manifestText = await manifestEntry.async("string");
+  const manifestText = await manifestEntry.async('string');
   const manifest = JSON.parse(manifestText);
 
   const datasetFilePath = manifest.datasetFilePath || {};
@@ -164,35 +175,35 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
     const file = zip.file(dicomPath);
     if (!file) continue;
 
-    const dicomBytes = await file.async("arraybuffer");
+    const dicomBytes = await file.async('arraybuffer');
 
     try {
-        const dataSet = dicomParser.parseDicom(new Uint8Array(dicomBytes));
-        
-        const sopInstanceUID = dataSet.string('x00080018');
-        const seriesInstanceUID = dataSet.string('x0020000e');
-        const sopClassUID = dataSet.string('x00080016');
+      const dataSet = dicomParser.parseDicom(new Uint8Array(dicomBytes));
 
-        dicomPathToSOP[dicomPath] = sopInstanceUID;
-        
-        // Helper function to parse DICOM array strings
-        const parseDicomArray = (tag, defaultValue) => {
-            const value = dataSet.string(tag);
-            if (!value) return defaultValue;
-            return value.split('\\').map(Number);
-        };
+      const sopInstanceUID = dataSet.string('x00080018');
+      const seriesInstanceUID = dataSet.string('x0020000e');
+      const sopClassUID = dataSet.string('x00080016');
 
-        dicomInfoMap[sopInstanceUID] = {
-            sopInstanceUID,
-            seriesInstanceUID,
-            sopClassUID,
-            imagePosition: parseDicomArray('x00200032', [0, 0, 0]),
-            imageOrientation: parseDicomArray('x00200037', [1, 0, 0, 0, 1, 0]),
-            pixelSpacing: parseDicomArray('x00280030', [1, 1]),
-        };
+      dicomPathToSOP[dicomPath] = sopInstanceUID;
+
+      // Helper function to parse DICOM array strings
+      const parseDicomArray = (tag, defaultValue) => {
+        const value = dataSet.string(tag);
+        if (!value) return defaultValue;
+        return value.split('\\').map(Number);
+      };
+
+      dicomInfoMap[sopInstanceUID] = {
+        sopInstanceUID,
+        seriesInstanceUID,
+        sopClassUID,
+        imagePosition: parseDicomArray('x00200032', [0, 0, 0]),
+        imageOrientation: parseDicomArray('x00200037', [1, 0, 0, 0, 1, 0]),
+        pixelSpacing: parseDicomArray('x00280030', [1, 1]),
+      };
     } catch (error) {
-        console.error(`Error parsing DICOM file ${dicomPath}:`, error);
-        continue;
+      console.error(`Error parsing DICOM file ${dicomPath}:`, error);
+      continue;
     }
   }
 
@@ -205,9 +216,15 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
   const rulers = manifest.tools?.rulers?.tools ?? [];
   for (const r of rulers) {
     annotations.push({
-      shape: "line",
-      sopInstanceUID: getSOPInstanceFromImageID(r.imageID, manifest, dicomPathToSOP) || "",
-      coordinates: [r.firstPoint[0], r.firstPoint[1], r.secondPoint[0], r.secondPoint[1]],
+      shape: 'line',
+      sopInstanceUID:
+        getSOPInstanceFromImageID(r.imageID, manifest, dicomPathToSOP) || '',
+      coordinates: [
+        r.firstPoint[0],
+        r.firstPoint[1],
+        r.secondPoint[0],
+        r.secondPoint[1],
+      ],
     });
   }
 
@@ -216,9 +233,15 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
   for (const rect of rects) {
     // const rectangleCoordinates = rectangleToPolyline(coordinates).flat();
     annotations.push({
-      shape: "rectangle",
-      sopInstanceUID: getSOPInstanceFromImageID(rect.imageID, manifest, dicomPathToSOP) || "",
-      coordinates: [rect.firstPoint[0], rect.firstPoint[1], rect.secondPoint[0], rect.secondPoint[1]]
+      shape: 'rectangle',
+      sopInstanceUID:
+        getSOPInstanceFromImageID(rect.imageID, manifest, dicomPathToSOP) || '',
+      coordinates: [
+        rect.firstPoint[0],
+        rect.firstPoint[1],
+        rect.secondPoint[0],
+        rect.secondPoint[1],
+      ],
     });
   }
 
@@ -232,7 +255,7 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
 //  DOMAIN DTOs
 // ------------------------------------------------------------------
 
-export type Shape = "line" | "rectangle";
+export type Shape = 'line' | 'rectangle';
 
 export interface Annotation {
   shape: Shape;
@@ -322,7 +345,10 @@ export class MeasurementCalculator {
   // ---------------------------------------------------------
   // RECTANGLE AREA (2D pixel space)
   // ---------------------------------------------------------
-  computeRectangleArea(coords: [number, number, number, number], sopInstanceUID): number {
+  computeRectangleArea(
+    coords: [number, number, number, number],
+    sopInstanceUID
+  ): number {
     const metaData = this.meta(sopInstanceUID);
     const [x1, y1, x2, y2] = coords;
 
@@ -359,16 +385,21 @@ export async function createManifest(zipBlob: Blob): Promise<Manifest> {
 
     let measurementValue: number | null = null;
 
-    if (ann.shape === "line") {
+    if (ann.shape === 'line') {
       measurementValue = measurementCalculator.computeLineLength(ann);
-    } else if (ann.shape === "rectangle") {
-      measurementValue = measurementCalculator.computeRectangleArea(ann.coordinates as [number, number, number, number], ann.sopInstanceUID);
-      ann.coordinates = rectangleToPolyline(ann.coordinates as [number, number, number, number]).flat();
+    } else if (ann.shape === 'rectangle') {
+      measurementValue = measurementCalculator.computeRectangleArea(
+        ann.coordinates as [number, number, number, number],
+        ann.sopInstanceUID
+      );
+      ann.coordinates = rectangleToPolyline(
+        ann.coordinates as [number, number, number, number]
+      ).flat();
     }
 
     manifestAnnotations.push({
       shape: ann.shape,
-      measurementName: ann.shape === "line" ? "Length" : "Area",
+      measurementName: ann.shape === 'line' ? 'Length' : 'Area',
       measurementValue,
 
       sopClassUID: meta.sopClassUID,
@@ -382,20 +413,21 @@ export async function createManifest(zipBlob: Blob): Promise<Manifest> {
   const arrayBuffer = await zipBlob.arrayBuffer();
   const zip = await JSZip.loadAsync(arrayBuffer);
 
-  const manifestFile = zip.file("manifest.json");
-  if (!manifestFile) throw new Error("manifest.json not found in zip");
+  const manifestFile = zip.file('manifest.json');
+  if (!manifestFile) throw new Error('manifest.json not found in zip');
 
-  const text = await manifestFile.async("text");
+  const text = await manifestFile.async('text');
   // Find the first DICOM file inside data/
-  const firstEntry = Object.values(zip.files)
-    .find(f => !f.dir && f.name.startsWith("data/"));
+  const firstEntry = Object.values(zip.files).find(
+    (f) => !f.dir && f.name.startsWith('data/')
+  );
 
   if (!firstEntry) {
-    throw new Error("No DICOM files found in ZIP under data/ folder.");
+    throw new Error('No DICOM files found in ZIP under data/ folder.');
   }
 
   // Parse the first DICOM file
-  const dicomBytes = await firstEntry.async("arraybuffer");
+  const dicomBytes = await firstEntry.async('arraybuffer');
   const dataSet = dicomParser.parseDicom(new Uint8Array(dicomBytes));
   // const dicomData = DicomMessage.readFile(new Uint8Array(dicomBytes));
   // const dataSet = dcmjs.data.DicomMetaDictionary.naturalizeDataset(dicomData.dict);
@@ -411,9 +443,55 @@ export async function createManifest(zipBlob: Blob): Promise<Manifest> {
     patientBirthDate: dataSet.string('x00100030'),
     // modality: dataSet.string("x00080060"),
     manifestJson: text,
-    createdBy: "VolView Application",
+    createdBy: 'VolView Application',
     createdAt: new Date().toISOString(),
     sopClassUid: dataSet.string('x00080016'),
     annotations: manifestAnnotations,
   };
+}
+
+export async function getVtiFilesZip(
+  originalZipBlob: Blob,
+  studyInstanceUID: string
+): Promise<FormData> {
+  // 1. Load the original zip
+  const originalZip = await JSZip.loadAsync(originalZipBlob);
+
+  // 2. Create a new zip for VTIs only
+  const vtiZip = new JSZip();
+
+  let vtiCount = 0;
+
+  for (const filePath of Object.keys(originalZip.files)) {
+    // Expecting: labels/s1.vti, labels/s2.vti, ...
+    if (
+      filePath.startsWith('labels/') &&
+      filePath.toLowerCase().endsWith('.vti')
+    ) {
+      const file = originalZip.files[filePath];
+      const fileData = await file.async('blob');
+
+      const fileName = filePath.split('/').pop()!;
+      vtiZip.file(fileName, fileData);
+
+      vtiCount++;
+    }
+  }
+
+  // if (vtiCount === 0) {
+  //   throw new Error('No VTI files found under labels/ in zip');
+  // }
+
+  // 3. Generate new zip blob
+  const vtiZipBlob = await vtiZip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+  });
+
+  // 4. Build multipart form data
+  const formData = new FormData();
+  formData.append('vtiZip', vtiZipBlob, 'segmentations.zip');
+  formData.append('studyInstanceUID', studyInstanceUID);
+
+  return formData;
 }

@@ -3,7 +3,10 @@ import io
 import zipfile
 from typing import List, Dict, Tuple, Any, Optional
 
+import httpx
 from pydantic import BaseModel, Field
+
+import settings
 
 # --- 子工具與通用模型 ---
 
@@ -180,7 +183,7 @@ def generate_data_structure(
 
     return datasets, data_sources, dataset_file_path
 
-def create_volview_zip_from_memory(
+async def create_volview_zip_from_memory(
     viewer_session: ViewerSession,
     generated_paths: {Dict[str, str]},
     subject_files: Dict[str, list],
@@ -209,7 +212,7 @@ def create_volview_zip_from_memory(
             #     json_output = viewer_session
             # else:
             json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
-            print(json_output)
+            # print(json_output)
             zf.writestr("manifest.json", json_output)
         
             for path in generated_paths.values():
@@ -226,6 +229,18 @@ def create_volview_zip_from_memory(
                 with io.BytesIO() as dcm_buffer:
                     subject_ds.save_as(dcm_buffer, write_like_original=True)
                     zf.writestr(path, dcm_buffer.getvalue())
+                    
+            # fetch segmentation files if any
+            segmenation_zip = await fetch_segmentation_zip(
+                study_uid=subject_files[filename][2]
+            )
+            with zipfile.ZipFile(segmenation_zip, "r") as seg_zip:
+                for entry in seg_zip.infolist():
+                    if entry.filename.startswith("labels/"):
+                        zf.writestr(
+                            entry.filename,
+                            seg_zip.read(entry.filename)
+                    )
 
         zip_bytes = zip_buffer.getvalue()
         
@@ -235,4 +250,20 @@ def create_volview_zip_from_memory(
 
     except Exception as e:
         print(f"Error creating zip file: {e}")
+        raise e
+
+async def fetch_segmentation_zip(
+    study_uid: str
+) -> bytes:
+    try:
+        async with httpx.AsyncClient(verify=False) as client:
+            seg_resp = await client.get(
+                f"{settings.ABPAPI_URL}/segmentation/{study_uid}"
+            )
+            seg_resp.raise_for_status()
+
+        return io.BytesIO(seg_resp.content)
+
+    except Exception as e:
+        print(f"Error fetching segmentation zip: {e}")
         raise e

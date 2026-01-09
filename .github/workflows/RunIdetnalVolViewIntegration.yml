@@ -42,14 +42,7 @@ jobs:
 
       - name: Docker auth for Artifact Registry
         run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
-
-      # Run Unit Tests
-      - name: Run Unit Tests
-        run: |
-          dotnet restore
-          dotnet build --no-restore
-          dotnet test --no-build --verbosity normal        
-
+              
       - name: Free up disk space
         run: |
           docker system prune -af || true

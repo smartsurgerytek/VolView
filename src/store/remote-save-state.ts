@@ -43,9 +43,11 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       });
 
       if (!response.ok) {
-        // const err = await response.text();
-        throw new Error("Save failed");
-      }
+    const errorText = await response.text();
+    console.error("Server Error Details:", errorText);
+    throw new Error(`Save failed: ${response.status} - ${errorText}`);
+}
+      
 
       const result = await response.json();
 

@@ -121,7 +121,7 @@ function useServerConnection() {
 const imageSelectionStore = useImageSelectionStore();
 const { selectedImageIDs: selected } = storeToRefs(imageSelectionStore);
 
-function handleGenerateRecord() {
+function handleGenerateRecord() {  
   generateRecord(selected.value);
 }
 

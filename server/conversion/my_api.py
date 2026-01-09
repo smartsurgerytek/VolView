@@ -1,4 +1,6 @@
 import gzip
+import os
+import requests
 from pathlib import Path
 from typing import Dict
 from fastapi import Depends, FastAPI, Request, HTTPException, Response
@@ -18,15 +20,16 @@ import pydicom
 from PIL import Image
 import base64
 
-from models import Manifest
+from .models import Manifest
 # from conversion import settings
-import settings
-from sr_generator import SRGenerator
+from . import settings
+from .sr_generator import SRGenerator 
+
 import vtk # 匯入 vtk
 from vtk.util import numpy_support
 
 from datetime import datetime
-from utils1 import (
+from .utils1 import (
     DotDict,
     get_filepath_for_subject,
     read_file_from_zip,
@@ -37,7 +40,7 @@ from utils1 import (
     update_private_tags
 )
 
-from utils2 import (
+from .utils2 import (
     Rulers,
     Tools,
     Layout,
@@ -51,9 +54,19 @@ from utils2 import (
 from dicomweb_client.api import DICOMwebClient
 
 # # TODO: url should be configured
-dicomweb_url = settings.DICOMWEB_URL #"http://localhost:8080/dicom-web"
-client = DICOMwebClient(url=dicomweb_url)
 
+dicomweb_url = settings.DICOMWEB_URL
+
+orthanc_user = os.getenv("ORTHANC_USERNAME")
+orthanc_pass = os.getenv("ORTHANC_PASSWORD")
+
+session = requests.Session()
+session.auth = (orthanc_user, orthanc_pass)
+
+client = DICOMwebClient(
+    url=dicomweb_url,
+    session=session
+)
 # volview = VolViewApi()
 
 app = FastAPI()
@@ -293,12 +306,12 @@ async def load_session_with_anno(request: Request):
                 # manifest_text = gzip.decompress(raw).decode("utf-8")                
         
                 # fetch manifest from api host's api
-                # abpapi_url = settings.ABPAPI_URL + "/manifest" #"https://localhost:44373/api/app/annotation/manifest"
-                
-                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
+                print('===================================================')
+                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"                
                 print(str(abpapi_url))
                 # Send GET with query param
                 response = await apiClient.get(str(abpapi_url))
+                # response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
                 response.raise_for_status()
                 
                 # Convert to JSON/dict
@@ -361,7 +374,11 @@ async def get_series_uid():
 
 
 # TODO:read ORTHANC_BASE_URL from .env
-ORTHANC_BASE_URL = "http://localhost:8080"
+# We take the DICOMWEB_URL from our settings (which switches between local/cloud)
+# and remove the "/dicom-web" part to get the base Orthanc administrative URL.
+
+
+ORTHANC_BASE_URL = os.getenv("DIRECT_ORTHANC_URL", "https://dicom-pacs-int.smartsurgerytek.net")
 
 async def delete_orthanc_series(
     patient_id: str, 

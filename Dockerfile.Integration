@@ -1,0 +1,58 @@
+# ---- Frontend builder ----
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app
+# Copy all files from the local directory
+COPY . .
+
+# Accept ARGS from GitHub Workflow
+ARG DICOMWEB_URL
+ARG FOUNDATION_API
+ARG FASTAPI_URL
+ARG FOUNDATION_APPSERVICE
+ARG FOUNDATION_WEB
+
+# Set the variables for Vite (Vite prioritize these over .env files)
+ENV VITE_DICOM_WEB_URL=$DICOMWEB_URL
+ENV VITE_FOUNDATION_API=$FOUNDATION_API
+ENV VITE_FOUNDATION_APPSERVICE=$FOUNDATION_APPSERVICE
+ENV VITE_FASTAPI_URL=$FASTAPI_URL
+ENV VITE_FOUNDATION_WEB=$FOUNDATION_WEB
+
+RUN npm ci
+RUN sed -i 's/"build": "vue-tsc --noEmit && vite build"/"build": "vite build"/' package.json
+
+# Build the project
+RUN npm run build
+
+# ---- Backend builder ----
+FROM python:3.10-slim AS backend-builder
+WORKDIR /app
+COPY . .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 libx11-6 \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install poetry
+WORKDIR /app/server/conversion
+ENV POETRY_HTTP_TIMEOUT=600
+ENV POETRY_REQUESTS_TIMEOUT=600
+RUN poetry config virtualenvs.in-project true
+RUN poetry lock && poetry install --with dev
+
+# ---- Frontend runtime ----
+FROM nginx:1.27-alpine AS frontend
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+# Pointing to the root file in the build context
+COPY ./nginx.Integration.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+
+# ---- Backend runtime ----
+FROM python:3.10-slim AS backend
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 libx11-6 \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install poetry
+WORKDIR /app
+COPY --from=backend-builder /app /app
+WORKDIR /app/server
+EXPOSE 4014
+CMD ["poetry", "run", "uvicorn", "conversion.my_api:app", "--host", "0.0.0.0", "--port", "4014"]

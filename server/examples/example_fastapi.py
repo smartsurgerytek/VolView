@@ -19,7 +19,13 @@ app.add_middleware(volview)
 # Set CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://dicom-viewer-int.smartsurgerytek.net",
+        "https://dicom-app-int.smartsurgerytek.net",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

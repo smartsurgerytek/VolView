@@ -106,16 +106,18 @@ async function fetchApiRulers(currentImageID: string, dicomData: DicomImageData)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             PatientId: patientId,
-            StudyInstanceUID: studyInstanceUID,
-            SeriesInstanceUID: seriesInstanceUID,
-            SopInstanceUID: sopInstanceUID,
-            ImageID: currentImageID,
+            StudyInstanceUid: studyInstanceUID,
+            SeriesInstanceUid: seriesInstanceUID,
+            SopInstanceUid: sopInstanceUID,
+            ImageId: currentImageID,
             ScaleX: pixelSpacing[0],
             ScaleY: pixelSpacing[1],
         }),
     });
 
     if (!response.ok) {
+        const errorDetail = await response.text();
+        console.error("Measurement Error:", errorDetail);
         throw new Error(`Server error: ${response.statusText}`);
     }
 

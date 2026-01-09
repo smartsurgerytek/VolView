@@ -1,0 +1,99 @@
+name: Deploy Idental Services (Cloud Run - Integration)
+
+on:
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: direct-hope-479409-c5
+  REGION: asia-east1
+  SERVICE_ACCOUNT: sa-for-idental-deployer@direct-hope-479409-c5.iam.gserviceaccount.com
+  VPC_CONNECTOR: vpc-connector-int
+
+  # Docker images  
+  DOCKER_IMAGE_VOLVIEW_FRONTEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-frontend
+  DOCKER_IMAGE_VOLVIEW_BACKEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-backend
+
+  # Build Arguments for VolView Frontend 
+  VV_FOUNDATION_API: https://dicom-api-int.smartsurgerytek.net/api/volview
+  VV_FASTAPI_URL: https://dicom-viewer-api-int.smartsurgerytek.net/api
+  VV_DICOMWEB_URL: https://dicom-api-int.smartsurgerytek.net/dicom-web  
+  VV_FOUNDATION_WEB: https://dicom-app-int.smartsurgerytek.net
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Volview (Integration)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code 
+        uses: actions/checkout@v3
+
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Docker auth for Artifact Registry
+        run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
+              
+      - name: Free up disk space
+        run: |
+          docker system prune -af || true
+          sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
+
+      # 5. VolView Frontend Build, Push & Deploy
+      - name: Build and Push VolView Frontend
+        run: |
+          docker build \
+            --target frontend \
+            --no-cache \
+            --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
+            --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
+            --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
+            --build-arg FOUNDATION_WEB=${{ env.VV_FOUNDATION_WEB }} \
+            -f Dockerfile.Integration \
+            -t ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest .
+          
+          docker push ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest
+
+      - name: Deploy VolView Frontend to Cloud Run
+        run: |
+          gcloud run deploy volview-frontend-int \
+            --image=${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest \
+            --platform=managed \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --service-account=${{ env.SERVICE_ACCOUNT }} \
+            --port=80 \
+            --memory=1Gi \
+            --cpu=1
+
+      # 6. VolView Backend Build, Push & Deploy
+      - name: Build and Push VolView Backend
+        run: |
+          docker build \
+            --target backend \
+            --no-cache \
+            -f Dockerfile.Integration \
+            -t ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest .
+          
+          docker push ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest
+
+      - name: Deploy VolView Backend to Cloud Run
+        run: |
+          gcloud run deploy volview-backend-int \
+            --image=${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest \
+            --platform=managed \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --service-account=${{ env.SERVICE_ACCOUNT }} \
+            --vpc-connector=${{ env.VPC_CONNECTOR }} \
+            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=${{ secrets.ORTHANC_PASSWORD }},DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
+            --port=4014 \
+            --memory=1Gi \
+            --cpu=1

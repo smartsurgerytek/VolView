@@ -5,7 +5,7 @@ import pydicom
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import ExplicitVRLittleEndian
 from pydicom.uid import generate_uid
-from models import Shape, Manifest
+from .models import Shape, Manifest
 
 ENHANCED_SR_SOP_CLASS_UID = "1.2.840.10008.5.1.4.1.1.88.22"
 TRANSFER_SYNTAX = ExplicitVRLittleEndian

@@ -1,9 +1,7 @@
 name: Deploy Idental Services (Cloud Run - Integration)
 
-on:  
-  push:
-    branches:
-      - 'test-record-page-devops-build'
+on:
+  workflow_dispatch:
 
 env:
   PROJECT_ID: direct-hope-479409-c5

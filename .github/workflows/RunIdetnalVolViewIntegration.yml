@@ -1,7 +1,9 @@
 name: Deploy Idental Services (Cloud Run - Integration)
 
 on:  
-  workflow_dispatch:
+  push:
+    branches:
+      - 'test-record-page-devops-build'
 
 env:
   PROJECT_ID: direct-hope-479409-c5
@@ -100,7 +102,7 @@ jobs:
             --allow-unauthenticated \
             --service-account=${{ env.SERVICE_ACCOUNT }} \
             --vpc-connector=${{ env.VPC_CONNECTOR }} \
-            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=iDentalOrth123,DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
+            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=${{ secrets.ORTHANC_PASSWORD }},DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
             --port=4014 \
             --memory=1Gi \
             --cpu=1

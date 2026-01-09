@@ -61,8 +61,8 @@ import json
 # # TODO: url should be configured
 
 dicomweb_url = settings.DICOMWEB_URL
-orthanc_user = os.getenv("ORTHANC_USERNAME", "admin")
-orthanc_pass = os.getenv("ORTHANC_PASSWORD", "iDentalOrth123")
+orthanc_user = os.getenv("ORTHANC_USERNAME")
+orthanc_pass = os.getenv("ORTHANC_PASSWORD")
 
 session = requests.Session()
 session.auth = (orthanc_user, orthanc_pass)

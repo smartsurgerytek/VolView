@@ -2,7 +2,9 @@ import { serialize } from '@/src/io/state-file';
 import { useMessageStore } from '@/src/store/messages';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { createManifest } from '../utils/saveAnnotation';
+import { createManifest, getVtiFilesZip } from '../utils/saveAnnotation';
+import JSZip from 'jszip';
+import { get } from '@kitware/vtk.js/macros';
 
 const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
   const saveUrl = ref('');
@@ -15,11 +17,10 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
   };
 
   async function extractDicomMetadataFromZip(zipBlob: Blob): Promise<Manifest> {
+    const manifest = await createManifest(zipBlob);
 
-      const manifest = await createManifest(zipBlob);
-
-      return manifest;
-    }
+    return manifest;
+  }
 
   const saveState = async () => {
     if (!saveUrl.value || isSaving.value) return;
@@ -31,27 +32,34 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       const manifestAndMetadata = await extractDicomMetadataFromZip(blob);
       const { VITE_FOUNDATION_API } = import.meta.env;
 
-      // Call ABP API
+      // Call ABP API - save manifest
       const saveManifestUrl = `${VITE_FOUNDATION_API}/save-manifest`;
       const response = await fetch(saveManifestUrl, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          // "Authorization": "Bearer " + localStorage.getItem("access_token")
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(manifestAndMetadata)
+        body: JSON.stringify(manifestAndMetadata),
       });
 
-      if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Server Error Details:", errorText);
-    throw new Error(`Save failed: ${response.status} - ${errorText}`);
-}
-      
+      // Call ABP API - save segmentation
+      const saveSegmentationFormData = await getVtiFilesZip(
+        blob,
+        manifestAndMetadata.studyInstanceUID
+      );
+      const saveSegmentationUrl = `${VITE_FOUNDATION_API}/save-segmentation`;
+      const segmentationResponse = await fetch(saveSegmentationUrl, {
+        method: 'POST',
+        body: saveSegmentationFormData,
+      });
+
+      if (!response.ok && !segmentationResponse.ok) {
+        throw new Error('Save failed');
+      }
 
       const result = await response.json();
 
-      console.log("Saved Manifest ID:", result.id);
+      console.log('Saved Manifest ID:', result.id);
     } catch (error) {
       messageStore.addError('Save Failed with error', `Failed from: ${error}`);
     } finally {

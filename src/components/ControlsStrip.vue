@@ -19,6 +19,7 @@ import { getMeasurement } from '../store/tools/measurement';
 // import { useDatasetStore } from '../store/datasets';
 import { useImageSelectionStore } from '../store/image-selection';
 import { generateRecord } from '../actions/generateRecord';
+import { getSegmentation } from '../store/tools/segmentation';
 
 interface Props {
   hasData: boolean;
@@ -138,23 +139,13 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
     <!-- <control-button size="40" icon="mdi-folder-open" name="Open files" @click="loadUserPromptedFiles" /> -->
     <control-button size="40" icon="mdi-content-save-all" name="Save" :loading="isSaving" @click="handleSave" />
     <control-button size="40" icon="mdi-tray-arrow-down" name="Download" />
-    <control-button size="40" icon="mdi-file-document-multiple" name="Record" @click="handleGenerateRecord"/>
+    <control-button size="40" icon="mdi-file-document-multiple" name="Record" @click="handleGenerateRecord" />
     <div class="my-1 tool-separator" />
-    <control-button
-      size="40"
-      icon="mdi-undo"
-      name="u=Undo"
-      @click=""
-    />
-    <control-button
-      size="40"
-      icon="mdi-redo"
-      name="Redo"
-      @click=""
-    />
+    <control-button size="40" icon="mdi-undo" name="u=Undo" @click="" />
+    <control-button size="40" icon="mdi-redo" name="Redo" @click="" />
     <div class="my-1 tool-separator" />
     <control-button size="40" icon="mdi-ruler-square" name="Measurement" @click="getMeasurement" />
-    <control-button size="40" icon="mdi-creation" name="Segmentation" />
+    <control-button size="40" icon="mdi-creation" name="Segmentation" @click="getSegmentation" />
     <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
       <template v-slot:activator="{ props }">
@@ -167,14 +158,14 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
           />
         </div>
       </template>
-    <v-card>
-      <v-card-text>
-        <v-radio-group v-model="layoutName" class="mt-0" hide-details>
-          <v-radio v-for="(value, key) in Layouts" :key="key" :label="value.name" :value="key" />
-        </v-radio-group>
-      </v-card-text>
-    </v-card>
-    </v-menu> -->
+<v-card>
+  <v-card-text>
+    <v-radio-group v-model="layoutName" class="mt-0" hide-details>
+      <v-radio v-for="(value, key) in Layouts" :key="key" :label="value.name" :value="key" />
+    </v-radio-group>
+  </v-card-text>
+</v-card>
+</v-menu> -->
 
     <controls-strip-tools v-if="hasData" />
     <v-spacer />

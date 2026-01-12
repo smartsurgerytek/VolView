@@ -3,46 +3,49 @@ import io
 import zipfile
 from typing import List, Dict, Tuple, Any, Optional
 
+import httpx
 from pydantic import BaseModel, Field
 
-# --- 子工具與通用模型 ---
+import settings
+
+# --- Sub-tools and common models ---
 
 class FrameOfReference(BaseModel):
-    """定義座標系的模型"""
+    """Model defining a coordinate system"""
     planeNormal: Tuple[int, int, int]
     planeOrigin: Tuple[int, int, int]
 
 class ToolLabel(BaseModel):
-    """定義工具標籤的通用模型"""
+    """Common model defining a tool label"""
     labelName: str
     color: str
     strokeWidth: int
 
 class FillableToolLabel(ToolLabel):
-    """擴充自 ToolLabel，增加了填充色"""
+    """Extended from ToolLabel, adds fill color"""
     fillColor: str
 
-# --- 各個工具 (Tools) 的詳細模型 ---
+# --- Detailed models for each tool ---
 
 class Crosshairs(BaseModel):
     position: Tuple[int, int, int]
 
 class Paint(BaseModel):
-    activeSegmentGroupID: Optional[Any] # JSON 中為 null
+    activeSegmentGroupID: Optional[Any]  # null in JSON
     activeSegment: Optional[int] = None
     brushSize: int
 
 class CropBounds(BaseModel):
-    """單一影像的裁切邊界"""
+    """Cropping bounds for a single image"""
     Sagittal: Tuple[float, float]
     Coronal: Tuple[float, float]
     Axial: Tuple[float, float]
 
 class Ruler(BaseModel):
-    """定義單一把尺規的模型"""
+    """Model defining a single ruler"""
     imageID: str
     frameOfReference: FrameOfReference
-    slice_val: int = Field(alias='slice') # 'slice' is python reserved words, process with alias
+    slice_val: int = Field(alias='slice')  # 'slice' is a Python reserved word, handled via alias
     placing: bool
     color: str
     strokeWidth: int
@@ -54,11 +57,11 @@ class Ruler(BaseModel):
     labelName: str
 
 class Polygons(BaseModel):
-    tools: List[Any] # JSON 中為空陣列
+    tools: List[Any]  # empty array in JSON
     labels: Dict[str, ToolLabel]
 
 class Rectangles(BaseModel):
-    tools: List[Any] # JSON 中為空陣列
+    tools: List[Any]  # empty array in JSON
     labels: Dict[str, FillableToolLabel]
 
 class Rulers(BaseModel):
@@ -66,10 +69,10 @@ class Rulers(BaseModel):
     labels: Dict[str, ToolLabel]
 
 class Tools(BaseModel):
-    """組合所有工具的頂層模型"""
+    """Top-level model combining all tools"""
     crosshairs: Crosshairs
     paint: Paint
-    crop: Dict[str, CropBounds] # Key 是 dataset 的 ID
+    crop: Dict[str, CropBounds]  # Key is dataset ID
     current: str
     polygons: Polygons
     rectangles: Rectangles
@@ -84,7 +87,7 @@ class Dataset(BaseModel):
 class DataSource(BaseModel):
     id: int
     type: str
-    # 使用 Optional 來表示某些欄位可能不存在
+    # Use Optional to indicate some fields may not exist
     sources: Optional[List[int]] = None
     fileId: Optional[int] = None
     fileType: Optional[str] = None
@@ -103,15 +106,15 @@ class ViewerSession(BaseModel):
     datasets: List[Dataset]
     dataSources: List[DataSource]
     datasetFilePath: Dict[str, str]
-    labelMaps: List[Any] # TODO: ignore segmentation at this time
+    labelMaps: List[Any]  # TODO: ignore segmentation for now
     tools: Tools
     layout: Layout
-    views: List[Any] # views can be empty
-    parentToLayers: List[Any] # empty
+    views: List[Any]  # views can be empty
+    parentToLayers: List[Any]  # empty
     primarySelection: str
 
     class Config:
-        # Pydantic V2 預設會處理 alias，但寫上可以更明確
+        # Pydantic v2 handles aliases by default, but this makes it explicit
         populate_by_name = True
 
 def generate_data_structure(
@@ -119,41 +122,42 @@ def generate_data_structure(
     filenames: List[str]
 ) -> Tuple[List[Dataset], List[DataSource], Dict[str, str]]:
     """
-    根據 DICOM UID 和檔名列表，產生 manifest 所需的資料結構。
+    Generate the data structures required for the manifest
+    based on DICOM UIDs and filename lists.
 
     Args:
-        dataset_uids: 一個包含 DICOM Series Instance UIDs 的列表。
-        filenames: 一個包含對應檔名的列表。
+        dataset_uids: A list of DICOM Series Instance UIDs.
+        filenames: A list of corresponding filenames.
 
     Returns:
-        一個包含三個元素的元組：
-        1. datasets: 符合 Pydantic `Dataset` 模型的物件列表。
-        2. data_sources: 符合 Pydantic `DataSource` 模型的物件列表。
-        3. dataset_file_path: 一個包含檔案路徑的字典。
+        A tuple containing three elements:
+        1. datasets: A list of objects conforming to the Pydantic `Dataset` model.
+        2. data_sources: A list of objects conforming to the Pydantic `DataSource` model.
+        3. dataset_file_path: A dictionary mapping file IDs to file paths.
     """
     if len(dataset_uids) != len(filenames):
-        raise ValueError("UID 列表和檔名列表的長度必須相同。")
+        raise ValueError("The UID list and filename list must have the same length.")
 
     datasets: List[Dataset] = []
     data_sources: List[DataSource] = []
     dataset_file_path: Dict[str, str] = {}
 
-    # 這個計數器是產生唯一 ID 的關鍵
+    # This counter is key to generating unique IDs
     next_id = 1
 
     for uid, filename in zip(dataset_uids, filenames):
-        # 1. 為每個檔案產生一組連續的 ID
+        # 1. Generate a sequence of IDs for each file
         collection_id = next_id
         source_id = next_id + 1
         file_id = next_id + 2
 
-        # 2. 建立 Dataset 物件，並連結到 collection_id
+        # 2. Create Dataset object and link it to collection_id
         dataset_obj = Dataset(id=uid, dataSourceId=collection_id)
         datasets.append(dataset_obj)
 
-        # 3. 建立兩個 DataSource 物件
+        # 3. Create two DataSource objects
 
-        # a. "file" 型別，連結到 file_id
+        # a. "file" type, linked to file_id
         file_source = DataSource(
             id=source_id,
             type="file",
@@ -162,7 +166,7 @@ def generate_data_structure(
         )
         data_sources.append(file_source)
 
-        # b. "collection" 型別，連結到 source_id
+        # b. "collection" type, linked to source_id
         collection_source = DataSource(
             id=collection_id,
             type="collection",
@@ -171,16 +175,16 @@ def generate_data_structure(
 
         data_sources.append(collection_source)
 
-        # 4. 建立檔案路徑，並以 file_id 作為 key
+        # 4. Build file path, using file_id as the key
         path = f"data/{file_id}/{filename}"
         dataset_file_path[str(file_id)] = path
 
-        # 5. 更新計數器，為下一個檔案準備
+        # 5. Update counter for the next file
         next_id += 3
 
     return datasets, data_sources, dataset_file_path
 
-def create_volview_zip_from_memory(
+async def create_volview_zip_from_memory(
     viewer_session: ViewerSession,
     generated_paths: {Dict[str, str]},
     subject_files: Dict[str, list],
@@ -188,14 +192,16 @@ def create_volview_zip_from_memory(
     is_manifest_from_sr: bool = False
 ) -> bytes:
     """
-    根據 ViewerSession 物件和 DICOM 檔案字典，產生 VolView 所需的 ZIP 檔案。
+    Generate a ZIP file required by VolView from a ViewerSession object
+    and a dictionary of DICOM files.
 
     Args:
-        viewer_session: 一個符合 Pydantic `ViewerSession` 模型的物件。
-        dicom_files: 一個字典，鍵為檔名，值為對應的 DICOM 檔案位元組內容。
+        viewer_session: An object conforming to the Pydantic `ViewerSession` model.
+        dicom_files: A dictionary where keys are filenames and values are
+                     the corresponding DICOM file bytes.
 
     Returns:
-        產生的 ZIP 檔案內容，型別為 bytes。
+        The generated ZIP file content as bytes.
     """
     
     zip_buffer = io.BytesIO()
@@ -205,11 +211,10 @@ def create_volview_zip_from_memory(
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
             
             # if is_manifest_from_sr:
-            #     # If manifest is from SR, we assume viewer_session is already JSON string
+            #     # If the manifest is from SR, assume viewer_session is already a JSON string
             #     json_output = viewer_session
             # else:
             json_output = viewer_session.model_dump_json(indent=4, by_alias=True)
-            print(json_output)
             zf.writestr("manifest.json", json_output)
         
             for path in generated_paths.values():
@@ -226,6 +231,18 @@ def create_volview_zip_from_memory(
                 with io.BytesIO() as dcm_buffer:
                     subject_ds.save_as(dcm_buffer, write_like_original=True)
                     zf.writestr(path, dcm_buffer.getvalue())
+                    
+            # fetch segmentation files if any
+            segmenation_zip = await fetch_segmentation_zip(
+                study_uid=subject_files[filename][2]
+            )
+            with zipfile.ZipFile(segmenation_zip, "r") as seg_zip:
+                for entry in seg_zip.infolist():
+                    if entry.filename.startswith("labels/"):
+                        zf.writestr(
+                            entry.filename,
+                            seg_zip.read(entry.filename)
+                    )
 
         zip_bytes = zip_buffer.getvalue()
         
@@ -235,4 +252,20 @@ def create_volview_zip_from_memory(
 
     except Exception as e:
         print(f"Error creating zip file: {e}")
+        raise e
+
+async def fetch_segmentation_zip(
+    study_uid: str
+) -> bytes:
+    try:
+        async with httpx.AsyncClient(verify=False) as client:
+            seg_resp = await client.get(
+                f"{settings.ABPAPI_URL}/segmentation/{study_uid}"
+            )
+            seg_resp.raise_for_status()
+
+        return io.BytesIO(seg_resp.content)
+
+    except Exception as e:
+        print(f"Error fetching segmentation zip: {e}")
         raise e

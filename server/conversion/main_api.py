@@ -48,8 +48,6 @@ from utils2 import (
     create_volview_zip_from_memory
 )
 
-# from volview_server import VolViewApi
-
 from dicomweb_client.api import DICOMwebClient
 
 from fastapi import FastAPI, UploadFile, Form
@@ -58,21 +56,30 @@ from pathlib import Path
 import subprocess
 import json
 
-# # TODO: url should be configured
-
 dicomweb_url = settings.DICOMWEB_URL
-orthanc_user = os.getenv("ORTHANC_USERNAME")
-orthanc_pass = os.getenv("ORTHANC_PASSWORD")
 
-session = requests.Session()
-session.auth = (orthanc_user, orthanc_pass)
-
-client = DICOMwebClient(
-    url=dicomweb_url,
-    session=session
-)
-
-# volview = VolViewApi()
+# Set this to 'integration' in your Cloud Run settings
+# Locally, it will default to 'development'
+env_type = os.getenv("ENV_TYPE", "development")
+print(f"Environment Type: {env_type}")
+if env_type == "development":
+    client = DICOMwebClient(
+        url=dicomweb_url
+    )
+else:
+    # Integration/Production: No defaults, force system to use real secrets
+    orthanc_user = os.getenv("ORTHANC_USERNAME")
+    orthanc_pass = os.getenv("ORTHANC_PASSWORD")
+    
+    if not orthanc_user or not orthanc_pass:
+        raise ValueError("ORTHANC_USERNAME and ORTHANC_PASSWORD must be set in the environment for production/integration environments.")
+    
+    session = requests.Session()
+    session.auth = (orthanc_user, orthanc_pass)
+    client = DICOMwebClient(
+        url=dicomweb_url,
+        session=session
+    )
 
 app = FastAPI()
 
@@ -154,7 +161,6 @@ async def save_session_to_sr_and_seg(request: Request):
 
                 # Save
                 # enforce_file_format will automatically caculate the (0002,0000) File Meta Information Group Length
-                # Todo: Handle response
                 response = client.store_instances(datasets=[sr_ds])
 
                 sr_index +=1
@@ -235,9 +241,8 @@ async def load_session(request: Request):
                 parentToLayers=[],
                 primarySelection=dataset_uids[-1]
             )
-
         # Save
-        session_zip_bytes = create_volview_zip_from_memory(
+        session_zip_bytes = await create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
@@ -284,35 +289,20 @@ async def load_session_with_anno(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
 
-            # print('======================')
-            # print(ds.get('SOPInstanceUID'))
-            # print(ds.get('Modality'))
-            # print(ds.get('ReferencedSOPInstanceUID'))
-
             # simulate datasetid
             if((ds.get('Modality') != 'SR') and (ds.get('Modality') != 'SEG')):
-                print('Found subject instance:', ds.get('SOPInstanceUID'))
-                # try to caculate datasetId
+                print("Image Instance Found")
                 datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
                 dataset_uids.append(datasetId)
-                # print('datasetId:', datasetId)
-
+                
                 subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
-                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
-
-                # print('subject_files:', subject_files)
-
+                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]                
+                
             # we are assuming only one SR in the study, and it contains the manifest
-            elif ds.get('Modality') == 'SR':
-                print('Found SR instance:', ds.get('SOPInstanceUID'))
-                # Extract the compressed manifest from private tag (0043,1010)
-                # raw = ds[(0x0043, 0x1010)].value
-                # Decompress + decode to text
-                # manifest_text = gzip.decompress(raw).decode("utf-8")                
-
+            elif ds.get('Modality') == 'SR':              
+        
                 # fetch manifest from api host's api
-                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}" #"https://localhost:44373/api/app/annotation/manifest"
-                print(str(abpapi_url))
+                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
                 # Send GET with query param
                 response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
                 response.raise_for_status()
@@ -351,7 +341,7 @@ async def load_session_with_anno(request: Request):
             is_manifest_from_sr = False
 
         # Save
-        session_zip_bytes = create_volview_zip_from_memory(
+        session_zip_bytes = await create_volview_zip_from_memory(
             viewer_session=viewer_session,
             generated_paths=generated_paths,
             subject_files=subject_files,
@@ -376,8 +366,6 @@ async def get_series_uid():
         return generate_uid()
 
 
-# TODO:read ORTHANC_BASE_URL from .env
-# ORTHANC_BASE_URL = "http://localhost:8080"
 ORTHANC_BASE_URL = os.getenv("DIRECT_ORTHANC_URL", "https://dicom-pacs-int.smartsurgerytek.net")
 
 async def delete_orthanc_series(
@@ -386,27 +374,29 @@ async def delete_orthanc_series(
     series_instance_uid: str
 ) -> dict:
     """
-    發送一個非同步的 DELETE 請求到 Orthanc 伺服器以刪除指定的 Series。
-    
-    此函式會根據 PatientID, StudyInstanceUID, 和 SeriesInstanceUID
-    計算出 Orthanc 的 SHA-1 ID (Stable Identifier)，然後才發送請求。
+    Send an asynchronous DELETE request to the Orthanc server to delete a specific Series.
+
+    This function computes Orthanc's SHA-1 stable identifier using the provided
+    PatientID, StudyInstanceUID, and SeriesInstanceUID before sending the request.
+
     Args:
-        patient_id (str): DICOM Tag (0010,0020) 的值
-        study_instance_uid (str): DICOM Tag (0020,000D) 的值
-        series_instance_uid (str): DICOM Tag (0020,000E) 的值
+        patient_id (str): Value of DICOM tag (0010,0020).
+        study_instance_uid (str): Value of DICOM tag (0020,000D).
+        series_instance_uid (str): Value of DICOM tag (0020,000E).
+
     Returns:
-        一個包含請求結果的字典。
+        dict: A dictionary containing the result of the DELETE request.
     """
 
-    orthanc_id = None # 先初始化
+    orthanc_id = None  # initialize first
 
     try:
-        # --- 1. 計算 Orthanc SHA-1 ID ---
-        # 根據規則：SHA-1(PatientID + StudyInstanceUID + SeriesInstanceUID)
-        # 確保字串串接順序和內容完全正確
+        # --- 1. Calculate Orthanc SHA-1 ID ---
+        # According to the rule: SHA-1(PatientID + StudyInstanceUID + SeriesInstanceUID)
+        # Ensure the string concatenation order and content are exactly correct
         concatenated_string = f"{patient_id}|{study_instance_uid}|{series_instance_uid}"
 
-        # 將字串編碼為 bytes (SHA-1 必須作用在 bytes 上)
+        # Encode the string to bytes (SHA-1 must operate on bytes)
         concatenated_bytes = concatenated_string.encode('utf-8')
         sha1_hash_obj = hashlib.sha1(concatenated_bytes)
         raw_hash = sha1_hash_obj.hexdigest()
@@ -414,39 +404,39 @@ async def delete_orthanc_series(
         for i in range(0, len(raw_hash), 8):
             parts.append(raw_hash[i:i+8])
         orthanc_id = "-".join(parts)
-        # 建立 SHA-1 hash 物件
-        #sha1_hash_obj = hashlib.sha1(concatenated_bytes)
+        # Create SHA-1 hash object
+        # sha1_hash_obj = hashlib.sha1(concatenated_bytes)
 
-        # 取得 16 進位字串 (這就是 Orthanc ID)
-        #orthanc_id = sha1_hash_obj.hexdigest()
+        # Get the hexadecimal string (this is the Orthanc ID)
+        # orthanc_id = sha1_hash_obj.hexdigest()
         # --- ------------------------ ---
 
-        # 2. 組合完整的 API 網址 (使用計算出來的 hash ID)
+        # 2. Build the full API URL (using the calculated hash ID)
         url = f"{ORTHANC_BASE_URL}/series/{orthanc_id}"
 
-        # 3. 發送請求
+        # 3. Send the request
         async with httpx.AsyncClient() as client:
-            print(f"--- 準備刪除 Series ---")
+            print(f"--- Preparing to delete Series ---")
             print(f"PatientID: {patient_id}")
             print(f"StudyInstanceUID: {study_instance_uid}")
             print(f"SeriesInstanceUID: {series_instance_uid}")
             print(f"Calculated Orthanc ID (SHA-1): {orthanc_id}")
-            print(f"正在發送 DELETE 請求至: {url}")
+            print(f"Sending DELETE request to: {url}")
 
             response = await client.delete(url)
 
-            # 檢查 HTTP 狀態碼
+            # Check HTTP status code
             response.raise_for_status()
 
-            # --- 請求成功 (2xx 狀態碼) ---
+            # --- Request successful (2xx status code) ---
             try:
-                # 嘗試解析 Orthanc 回傳的 JSON 
+                # Try to parse JSON returned by Orthanc
                 response_data = response.json()
             except json.JSONDecodeError:
-                # 如果 Orthanc 回傳的是空內容或純文字
+                # If Orthanc returns empty content or plain text
                 response_data = response.text
 
-            print(f"成功刪除 Series (狀態碼: {response.status_code})")
+            print(f"Series deleted successfully (status code: {response.status_code})")
             return {
                 "success": True,
                 "status_code": response.status_code,
@@ -455,18 +445,18 @@ async def delete_orthanc_series(
             }
 
     except httpx.HTTPStatusError as e:
-        # 處理 HTTP 錯誤 (例如 404, 405, 500)
-        print(f"HTTP 錯誤: {e.response.status_code} - {e.response.text}")
+        # Handle HTTP errors (e.g. 404, 405, 500)
+        print(f"HTTP error: {e.response.status_code} - {e.response.text}")
         return {
             "success": False,
             "status_code": e.response.status_code,
-            "orthanc_id": orthanc_id, # 仍然回傳 ID 方便除錯
+            "orthanc_id": orthanc_id,  # still return ID for debugging
             "error": "HTTP Error",
             "details": e.response.text
         }
     except httpx.RequestError as e:
-        # 處理連線錯誤 (例如連線被拒絕)
-        print(f"連線錯誤: {e}")
+        # Handle connection errors (e.g. connection refused)
+        print(f"Connection error: {e}")
         return {
             "success": False,
             "status_code": None,
@@ -475,8 +465,8 @@ async def delete_orthanc_series(
             "details": str(e)
         }
     except Exception as e:
-        # 捕捉其他未預期的錯誤
-        print(f"發生未預期錯誤: {e}")
+        # Catch other unexpected errors
+        print(f"An unexpected error occurred: {e}")
         return {
             "success": False,
             "status_code": None,
@@ -542,19 +532,19 @@ async def get_segmentation(request: Request):
 
 def get_base64_string(ds):
     new_image = ds.pixel_array.astype(float)
+    print("Original image shape:", new_image.shape)
 
     # Rescaling the image
     scaled_image = (np.maximum(new_image, 0) / new_image.max()) * 255.0
-
+    
     scaled_image = np.uint8(scaled_image)
     final_image = Image.fromarray(scaled_image)
-
+    
     # save
     buffered = io.BytesIO()
     final_image.save(buffered, format="PNG")
 
     base64_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
-
     return base64_string
 
 async def get_dentistry_segmentation(base64_string: str):
@@ -583,17 +573,16 @@ async def get_dentistry_segmentation(base64_string: str):
             response.raise_for_status()
 
             response_data = response.json()
-            print(f"成功取得 API 回應 (狀態碼: {response.status_code})")
-            #print(response_data) # 印出 API 回傳的資料
+            print(f"API response received successfully (status code: {response.status_code})")
             return response_data
 
         except httpx.HTTPStatusError as e:
-            print(f"API 請求錯誤: {e.response.status_code} - {e.response.text}")
+            print(f"API request error: {e.response.status_code} - {e.response.text}")
         except httpx.RequestError as e:
-            print(f"網路連線錯誤: {e}")
+            print(f"Network connection error: {e}")
             raise
         except json.JSONDecodeError:
-            print(f"無法解析 API 回應 (非 JSON): {response.text}")
+            print(f"Unable to parse API response (non-JSON): {response.text}")
             raise
 
 def get_vti_file(instance, segmentation_response):
@@ -601,112 +590,122 @@ def get_vti_file(instance, segmentation_response):
         # 3. get metadata
         H, W = instance.Rows, instance.Columns
 
-        ## afeter set PixelSpacing=[1.0, 1.0] brush works!
-        pixel_spacing = [1.0, 1.0] ## instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0]
+        ## after setting PixelSpacing=[1.0, 1.0], the brush works!
+        pixel_spacing = instance.PixelSpacing if "PixelSpacing" in instance else [1.0, 1.0]
         slice_thickness = float(instance.SliceThickness if "SliceThickness" in instance else 1.0)
         origin = instance.ImagePositionPatient if "ImagePositionPatient" in instance else [0.0, 0.0, 0.0]
 
-        # 4. 建立畫布
-        # *** 假設: class ID 範圍為 0-255 (uint8) ***
+        # 4. create canvas
+        # *** assumption: class ID range is 0-255 (uint8) ***
         final_mask = np.zeros((H, W), dtype=np.uint8)
 
-        # 5. 解碼 RLE 並合成 Mask
-        # *** 假設: API 回應的結構如同您的範例 ***
-        # (您可能需要根據您的 API 回應調整 'yolo_results' 和 'yolov8_contents')
+        # 5. decode RLE and compose mask
+        # *** assumption: API response structure matches your example ***
+        # (you may need to adjust 'yolo_results' and 'yolov8_contents' based on your API response)
         if 'yolo_results' not in segmentation_response or 'yolov8_contents' not in segmentation_response['yolo_results']:
             raise ValueError("API response does not contain 'yolo_results.yolov8_contents'")
-
+        
+        class_names = segmentation_response['yolo_results']['class_names']
+        class_name_to_class_id = {v: k for k, v in class_names.items()}
+        
         yolov8_contents = segmentation_response['yolo_results']['yolov8_contents']
 
         print(f"Processing {len(yolov8_contents)} segmented objects...")
 
         for obj in yolov8_contents:
             points = obj.get('points')
-            class_id = obj.get('class_id') 
+            label = obj.get('label')
+            class_id = int(class_name_to_class_id.get(label))
 
             if not points or class_id is None:
+                print("Skipping invalid object with missing points or class_id")
                 continue
 
-            # 1. 解碼 RLE
+            # 1. decode RLE
             bbox_mask, x1, y1, x2, y2 = rle2Mask(points)
-
             if bbox_mask.size == 0:
                 print(f"Skipping empty mask for class {class_id}")
                 continue
 
-            # 2. 尋找 來源 (bbox_mask) 和 目標 (final_mask) 之間的重疊區域
+            # 2. find overlapping region between source (bbox_mask) and target (final_mask)
 
-            # --- 2a. 計算重疊區域的「全域座標」(相對於 final_mask) ---
-            # BBox 的 x2, y2 是包含在內的，所以結束點要 +1
+            # --- 2a. compute overlap region in global coordinates (relative to final_mask) ---
+            # BBox x2, y2 are inclusive, so add +1 to the end index
             x_start_global = max(x1, 0)
             y_start_global = max(y1, 0)
-            x_end_global = min(x2 + 1, W) # W 是 final_mask 的寬度
-            y_end_global = min(y2 + 1, H) # H 是 final_mask 的高度
+            x_end_global = min(x2 + 1, W)  # W is the width of final_mask
+            y_end_global = min(y2 + 1, H)  # H is the height of final_mask
+            
+            print(f"Class {class_id}: Global Overlap Region - X: [{x_start_global}, {x_end_global}), Y: [{y_start_global}, {y_end_global})")
 
-            # --- 2b. 如果根本沒有重疊，就跳過 ---
+            # --- 2b. if there is no overlap at all, skip ---
             if x_start_global >= x_end_global or y_start_global >= y_end_global:
                 print(f"Skipping mask for class {class_id} (BBox completely out of bounds)")
                 continue
 
-            # --- 2c. 計算重疊區域的「區域座標」(相對於 bbox_mask) ---
+            # --- 2c. compute overlap region in local coordinates (relative to bbox_mask) ---
             x_start_local = x_start_global - x1
             y_start_local = y_start_global - y1
             x_end_local = x_end_global - x1
             y_end_local = y_end_global - y1
+            
+            print(f"Class {class_id}: Local Overlap Region - X: [{x_start_local}, {x_end_local}), Y: [{y_start_local}, {y_end_local})")
 
-            # 3. 根據計算好的範圍，從 來源(src) 裁切並貼到 目標(dest)
+            # 3. based on the computed ranges, crop from source and paste into target
 
-            # 取得 來源(bbox_mask) 中要被複製的區域
+            # get the region to copy from the source (bbox_mask)
             src_slice = (slice(y_start_local, y_end_local), slice(x_start_local, x_end_local))
             mask_to_paste = bbox_mask[src_slice]
 
-            # 取得 目標(final_mask) 中要被貼上的區域
+            # get the region to paste into the target (final_mask)
             dest_slice = (slice(y_start_global, y_end_global), slice(x_start_global, x_end_global))
             paste_region = final_mask[dest_slice]
 
-            # 4. 執行貼上
-            # 只在 mask_to_paste 為 1 (前景) 的地方貼上
-            valid_paste_mask = (mask_to_paste == 1)
-            paste_region[valid_paste_mask] = class_id + 1 # 使用 class_id + 1
+            # 4. perform paste
+            # only paste where mask_to_paste is 1 (foreground)
+            valid_paste_mask = (mask_to_paste > 0)
+            paste_region[valid_paste_mask] = class_id + 1  # use class_id + 1
 
-        # 6. 轉換為 VTI (使用 VTK)
+        # 6. convert to VTI (using VTK)
         print("Converting final mask to VTI...")
 
-        # 6.1. 建立 vtkImageData
+        # 6.1. create vtkImageData
         image_data = vtk.vtkImageData()
-        image_data.SetDimensions(W, H, 1) # VTK 順序: (X, Y, Z)
-        image_data.SetSpacing(float(pixel_spacing[1]), float(pixel_spacing[0]), slice_thickness) # (X, Y, Z) Spacing
-        image_data.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2])) # (X, Y, Z) Origin
+        print(f"VTI Image Dimensions: W={W}, H={H}")
+        image_data.SetDimensions(W, H, 1)  # VTK order: (X, Y, Z)
+        # image_data.SetSpacing(float(pixel_spacing[0]), float(pixel_spacing[1]), slice_thickness)
+        image_data.SetSpacing(1, 1, slice_thickness)  # (X, Y, Z) spacing
+        image_data.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2]))  # (X, Y, Z) origin
 
-        # 6.2. 轉換 NumPy 陣列為 VTK 陣列
+        # 6.2. convert NumPy array to VTK array
         # final_mask (H, W) -> ravel('C') -> (W*H,)
+
         vtk_data_array = numpy_support.numpy_to_vtk(
             num_array=final_mask.ravel(order='C'),
             deep=True,
-            array_type=vtk.VTK_UNSIGNED_CHAR # 對應 np.uint8
+            array_type=vtk.VTK_UNSIGNED_CHAR  # corresponds to np.uint8
         )
 
-        # 6.3. 將資料設定到 vtkImageData
+        # 6.3. set data on vtkImageData
         image_data.GetPointData().SetScalars(vtk_data_array)
 
-        # 6.4. 寫入記憶體
+        # 6.4. write to memory
         writer = vtk.vtkXMLImageDataWriter()
         writer.SetDataModeToBinary()
         writer.SetInputData(image_data)
         writer.WriteToOutputStringOn()
         writer.Write()
 
-        # 取得位元組資料
+        # get byte content
         vti_content_bytes = writer.GetOutputString()
 
-        # 7. 回傳 VTI 檔案
+        # 7. return VTI file
         print("Sending .vti file as response.")
-
-        # ##### TODO: only for testing
+        # ##### TODO: for testing only
         # debug_filename = "debug_vti_response_output.vti"
         # with open(debug_filename, "w", encoding="utf-8") as f:
         #     f.write(vti_content_bytes)
-        # print(f"--- debug_vti_response_output 已儲存到 {debug_filename} 供除錯 ---")
+        # print(f"--- debug_vti_response_output saved to {debug_filename} for debugging ---")
         # #####
 
         return vti_content_bytes
@@ -714,16 +713,17 @@ def get_vti_file(instance, segmentation_response):
     except Exception as e:
         print(f"Error getting segmentation: {e}")
         import traceback
-        traceback.print_exc() # 印出詳細的錯誤堆疊
+        traceback.print_exc()  # print detailed error stack trace
         raise HTTPException(status_code=500, detail=str(e))
+
 
 def rle2Mask(rle: list) -> tuple[np.ndarray, int, int, int, int]:
     """
-    將 RLE (包含 BBox) 解碼為 2D 遮罩陣列
-    返回: (bbox_mask, x1_int, y1_int, x2_int, y2_int)
+    Decode RLE (including BBox) into a 2D mask array.
+    Returns: (bbox_mask, x1_int, y1_int, x2_int, y2_int)
     """
     if len(rle) < 4:
-        # 資料不足
+        # insufficient data
         return np.zeros((0, 0), dtype=np.uint8), 0, 0, 0, 0
 
     bbox_coords = rle[-4:]
@@ -804,6 +804,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# DCMQI converter API endpoint (currently disabled) [for future use]
 # @app.post("/convert/vti-to-seg")
 # async def convert_vti_to_seg(
 #     study_uid: str = Form(...),

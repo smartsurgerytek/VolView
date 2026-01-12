@@ -231,7 +231,6 @@ export async function parseVolViewZip(zipBlob: Blob): Promise<ZipParseResult> {
   // rectangles
   const rects = manifest.tools?.rectangles?.tools ?? [];
   for (const rect of rects) {
-    // const rectangleCoordinates = rectangleToPolyline(coordinates).flat();
     annotations.push({
       shape: 'rectangle',
       sopInstanceUID:
@@ -477,10 +476,6 @@ export async function getVtiFilesZip(
       vtiCount++;
     }
   }
-
-  // if (vtiCount === 0) {
-  //   throw new Error('No VTI files found under labels/ in zip');
-  // }
 
   // 3. Generate new zip blob
   const vtiZipBlob = await vtiZip.generateAsync({

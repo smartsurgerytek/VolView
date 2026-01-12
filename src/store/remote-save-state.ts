@@ -38,7 +38,6 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // "Authorization": "Bearer " + localStorage.getItem("access_token")
         },
         body: JSON.stringify(manifestAndMetadata),
       });
@@ -51,15 +50,10 @@ const useRemoteSaveStateStore = defineStore('remoteSaveState', () => {
       const saveSegmentationUrl = `${VITE_FOUNDATION_API}/save-segmentation`;
       const segmentationResponse = await fetch(saveSegmentationUrl, {
         method: 'POST',
-        headers: {
-          // 'Content-Type': 'application/json',
-          // "Authorization": "Bearer " + localStorage.getItem("access_token")
-        },
         body: saveSegmentationFormData,
       });
 
       if (!response.ok && !segmentationResponse.ok) {
-        // const err = await response.text();
         throw new Error('Save failed');
       }
 

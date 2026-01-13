@@ -51,8 +51,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 libx11-6 \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install poetry
+
+
 WORKDIR /app
 COPY --from=backend-builder /app /app
-WORKDIR /app/server
+
+ENV PYTHONPATH=/app
+
 EXPOSE 4014
-CMD ["poetry", "run", "uvicorn", "conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]
+CMD ["poetry", "run", "uvicorn", "server.conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]

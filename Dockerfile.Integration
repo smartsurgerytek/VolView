@@ -52,11 +52,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 RUN pip install poetry
 
-
 WORKDIR /app
 COPY --from=backend-builder /app /app
 
 ENV PYTHONPATH=/app
-
 EXPOSE 4014
-CMD ["poetry", "run", "uvicorn", "server.conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]
+CMD ["poetry", "--directory", "/app/server", "run", "uvicorn", "server.conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]

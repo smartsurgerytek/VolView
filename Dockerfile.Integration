@@ -55,7 +55,14 @@ RUN pip install poetry
 WORKDIR /app
 COPY --from=backend-builder /app /app
 
-WORKDIR /app/server
-ENV PYTHONPATH=/app/server
+# ✅ Step 1: Set WORKDIR to where main_api.py and models.py live
+WORKDIR /app/server/conversion
+
+# ✅ Step 2: Set PYTHONPATH to include this directory
+ENV PYTHONPATH=/app/server/conversion
+
 EXPOSE 4014
-CMD ["poetry", "run", "uvicorn", "conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]
+
+# ✅ Step 3: Run uvicorn directly from this directory
+# We use the --directory flag to tell Poetry where pyproject.toml is
+CMD ["poetry", "--directory", "/app/server", "run", "uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "4014"]

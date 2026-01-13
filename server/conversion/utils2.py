@@ -226,6 +226,7 @@ async def create_volview_zip_from_memory(
                     study_instance_uid=subject_files[filename][2],
                     series_instance_uid=subject_files[filename][1],
                     sop_instance_uid=subject_files[filename][0],
+                    media_types=('application/dicom',)
                 )
         
                 with io.BytesIO() as dcm_buffer:

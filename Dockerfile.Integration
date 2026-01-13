@@ -55,13 +55,15 @@ RUN pip install poetry
 WORKDIR /app
 COPY --from=backend-builder /app /app
 
-# ✅ Set WORKDIR to the server folder where pyproject.toml is
+# ✅ Set WORKDIR to the specific conversion folder as requested
 WORKDIR /app/server/conversion
 
-# ✅ Add the current directory to PYTHONPATH
+# ✅ Add the PARENT directory (/app/server) to PYTHONPATH 
+# This allows 'import models' to work even while inside the conversion folder
 ENV PYTHONPATH=/app/server
 
 EXPOSE 4014
 
-# ✅ Simplified command: Run directly from the server folder
-CMD ["poetry", "run", "uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "4014"]
+# ✅ Run poetry using the project root directory flag
+# This tells poetry where the pyproject.toml is located
+CMD ["poetry", "--directory", "/app/server", "run", "uvicorn", "main_api:app", "--host", "0.0.0.0", "--port", "4014"]

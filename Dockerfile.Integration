@@ -56,9 +56,6 @@ WORKDIR /app
 COPY --from=backend-builder /app /app
 
 WORKDIR /app/server
-
 ENV PYTHONPATH=/app/server
-
 EXPOSE 4014
-
 CMD ["poetry", "run", "uvicorn", "conversion.main_api:app", "--host", "0.0.0.0", "--port", "4014"]

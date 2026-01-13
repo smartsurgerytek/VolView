@@ -20,9 +20,9 @@ import pydicom
 from PIL import Image
 import base64
 
-from server.models import Manifest
+from models import Manifest
 # from conversion import settings
-from server.conversion import settings
+import settings
 from sr_generator import SRGenerator
 import vtk # 匯入 vtk
 from vtk.util import numpy_support

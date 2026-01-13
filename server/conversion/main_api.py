@@ -60,7 +60,7 @@ dicomweb_url = settings.DICOMWEB_URL
 
 # Set this to 'integration' in your Cloud Run settings
 # Locally, it will default to 'development'
-env_type = os.getenv("ENV_TYPE", "development")
+env_type = os.getenv("PYTHON_ENV", "development")
 print(f"Environment Type: {env_type}")
 if env_type == "development":
     client = DICOMwebClient(

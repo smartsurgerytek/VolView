@@ -56,7 +56,8 @@ from pathlib import Path
 import subprocess
 import json
 
-dicomweb_url = settings.DICOMWEB_URL
+
+dicomweb_url = os.getenv("DICOMWEB_URL", settings.DICOMWEB_URL)
 
 # Set this to 'integration' in your Cloud Run settings
 # Locally, it will default to 'development'

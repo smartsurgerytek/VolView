@@ -93,7 +93,7 @@ jobs:
             --allow-unauthenticated \
             --service-account=${{ env.SERVICE_ACCOUNT }} \
             --vpc-connector=${{ env.VPC_CONNECTOR }} \
-            --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=${{ secrets.ORTHANC_PASSWORD }},DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
+            --set-env-vars="PYTHON_ENV=Integration,DICOMWEB_URL=https://dicom-pacs-int.smartsurgerytek.net/dicom-web,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=${{ secrets.ORTHANC_PASSWORD }},DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
             --port=4014 \
             --memory=1Gi \
             --cpu=1

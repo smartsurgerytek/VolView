@@ -1,112 +1,85 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useToolStore } from '@/src/store/tools';
-import { Tools } from '@/src/store/tools/types';
 import { useDentalStore } from '@/src/store/tools/dental';
 
-const toolStore = useToolStore();
 const dentalStore = useDentalStore();
+const { inferenceData } = storeToRefs(dentalStore);
 
-const { activeLabel, labels } = storeToRefs(dentalStore);
-
-const isDentalToolActive = computed(() => toolStore.currentTool === Tools.Dental);
-
-// Get the label ID for TRL and CAL by searching for the label name
-const getTRLLabelId = () => {
-  const entry = dentalStore.findLabel('TRL');
-  return entry ? entry[0] : '';
+const getPeriodontalStage = (abld: number): { stage: number; color: string } => {
+  if (abld === 0) {
+    return { stage: 0, color: 'success' };
+  }
+  if (abld < 0.15) {
+    return { stage: 1, color: 'info' };
+  }
+  if (abld < 0.33) {
+    return { stage: 2, color: 'warning' };
+  }
+  return { stage: 3, color: 'error' };
 };
 
-const getCALLabelId = () => {
-  const entry = dentalStore.findLabel('CAL');
-  return entry ? entry[0] : '';
-};
+const teethList = computed(() => {
+  if (!inferenceData.value?.teeth) return [];
 
-// Check which type is currently active by label name
-const activeLabelName = computed(() => {
-  if (!activeLabel.value) return '';
-  return labels.value[activeLabel.value]?.labelName || '';
+  return Object.entries(inferenceData.value.teeth).map(([toothId, toothData]: [string, any]) => {
+    const pairs = dentalStore.getToothPairs(toothId);
+    return {
+      toothId,
+      centerPosition: toothData.centerPosition,
+      pairs,
+    };
+  });
 });
+</script>
 
-function activateTRLTool() {
-  toolStore.setCurrentTool(Tools.Dental);
-  const trlLabelId = getTRLLabelId();
-  if (trlLabelId) dentalStore.setActiveLabel(trlLabelId);
-}
-
-function activateCALTool() {
-  toolStore.setCurrentTool(Tools.Dental);
-  const calLabelId = getCALLabelId();
-  if (calLabelId) dentalStore.setActiveLabel(calLabelId);
-}  
-</script>  
-  
 <template>
   <div class="pa-3">
-    <div class="header mb-3">Dental Tools</div>
-
-    <div class="content">
-      <v-row dense>
-        <v-col cols="6">
-          <v-btn
-            :color="activeLabelName === 'TRL' && isDentalToolActive ? 'primary' : 'default'"
-            :variant="activeLabelName === 'TRL' && isDentalToolActive ? 'flat' : 'outlined'"
-            @click="activateTRLTool"
-            class="w-100"
-            prepend-icon="mdi-ruler"
-          >
-            TRL
-          </v-btn>
-        </v-col>
-
-        <v-col cols="6">
-          <v-btn
-            :color="activeLabelName === 'CAL' && isDentalToolActive ? 'primary' : 'default'"
-            :variant="activeLabelName === 'CAL' && isDentalToolActive ? 'flat' : 'outlined'"
-            @click="activateCALTool"
-            class="w-100"
-            prepend-icon="mdi-ruler"
-          >
-            CAL
-          </v-btn>
-        </v-col>
-      </v-row>
+    <!-- Empty state -->
+    <div v-if="teethList.length === 0" class="text-center py-8">
+      <v-icon size="64" color="grey-lighten-1" class="mb-4">mdi-tooth-outline</v-icon>
+      <p class="text-body-1 text-grey-darken-1">No dental data available</p>
+      <p class="text-body-2 text-grey">Click the Measurement button to load data</p>
     </div>
 
-    <v-divider class="my-3" />
+    <!-- Teeth list -->
+    <div v-else>
+      <div v-for="tooth in teethList" :key="tooth.toothId" :title="`Tooth ${tooth.toothId}`" class="mb-4 pa-3 border rounded">
+        <div>
+          <!-- <div class="mb-2">
+            <strong>Center Position:</strong>
+            {{tooth.centerPosition?.map((p: number) => p.toFixed(2)).join(', ') || 'N/A'}}
+          </div> -->
 
-    <div class="info-section">
-      <h4 class="text-subtitle-2 mb-2">Instructions</h4>
-      <ul class="text-caption">
-        <li>Click TRL or CAL to activate the tool</li>
-        <li>Click two points to draw each line</li>
-        <li>Lines are automatically completed</li>
-        <li>Switch tools or continue drawing more lines</li>
-        <li>ABLD = CAL length / TRL length</li>
-      </ul>
+          <div v-if="tooth.pairs.length > 0">
+            <v-list density="compact">
+              <v-list-item v-for="(pair, index) in tooth.pairs" :key="index">
+                <template v-slot:prepend>
+                  <v-icon color="primary">mdi-ruler</v-icon>
+                </template>
+                <v-list-item-title class="mb-2">
+                  <!-- <span>Pair {{ index + 1 }}</span> -->
+                  <span>ABLD: {{ pair.abld?.toFixed(3) || 'N/A' }}</span>
+                  <v-chip v-if="pair.abld !== undefined && pair.abld !== null"
+                    :color="getPeriodontalStage(pair.abld).color" size="small" class="ml-2">
+                    Stage {{ getPeriodontalStage(pair.abld).stage }}
+                  </v-chip>
+                </v-list-item-title>
+                <v-list-item-subtitle>
+                  TRL: {{ pair.trl ? dentalStore.lengthByID[pair.trl.id]?.toFixed(2) : 'N/A' }}mm |
+                  CAL: {{ pair.cal ? dentalStore.lengthByID[pair.cal.id]?.toFixed(2) : 'N/A' }}mm
+                </v-list-item-subtitle>
+              </v-list-item>
+            </v-list>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</template>  
-  
-<style scoped>  
-.header {  
-  font-weight: 600;  
-  font-size: 1.1rem;  
-}  
-  
-.content {  
-  display: flex;  
-  flex-direction: column;  
-  gap: 8px;  
-}  
-  
-.info-section ul {  
-  padding-left: 16px;  
-  margin: 0;  
-}  
-  
-.info-section li {  
-  margin-bottom: 4px;  
-}  
+</template>
+
+<style scoped>
+.text-h6 {
+  font-weight: 600;
+}
 </style>

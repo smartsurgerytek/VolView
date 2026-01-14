@@ -43,6 +43,7 @@
 import { Component, computed, defineComponent, ref, watch } from 'vue';
 
 import { ConnectionState, useServerStore } from '@/src/store/server';
+import { storeToRefs } from 'pinia';
 import DataBrowser from './DataBrowser.vue';
 import RenderingModule from './RenderingModule.vue';
 import AnnotationsModule from './AnnotationsModule.vue';
@@ -51,6 +52,7 @@ import ProbeView from './ProbeView.vue';
 import { useToolStore } from '../store/tools';
 import { Tools } from '../store/tools/types';
 import DentalModule from './DentalModule.vue';
+import { useDentalStore } from '../store/tools/dental';
 
 interface Module {
   name: string;
@@ -106,19 +108,22 @@ export default defineComponent({
     const selectedModuleIndex = ref(0);
 
     const toolStore = useToolStore();
+    const dentalStore = useDentalStore();
+    const { hasLoadedInference } = storeToRefs(dentalStore);
 
     const serverStore = useServerStore();
     const modules = computed(() => {
+      let moduleList = Modules;
+
       if (!serverStore.url) {
-        return Modules.filter((m) => m.name !== 'Remote');
+        moduleList = Modules.filter((m) => m.name !== 'Remote');
       }
 
-      if (serverStore.connState === ConnectionState.Connected) {
-        return Modules;
-      }
-
-      return Modules.map((m) => {
-        if (m.name === 'Remote') {
+      return moduleList.map((m) => {
+        if (m.name === 'Remote' && serverStore.connState !== ConnectionState.Connected) {
+          return { ...m, disabled: true };
+        }
+        if (m.name === 'Dental' && !hasLoadedInference.value) {
           return { ...m, disabled: true };
         }
         return m;
@@ -133,6 +138,19 @@ export default defineComponent({
         }
         if (autoSwitchToDentalTools.includes(newTool)) {
           // Find the Dental module index dynamically
+          const dentalIndex = modules.value.findIndex(m => m.name === 'Dental');
+          if (dentalIndex !== -1) {
+            selectedModuleIndex.value = dentalIndex;
+          }
+        }
+      }
+    );
+
+    // Watch for when inference data is first loaded, then switch to Dental tab
+    watch(
+      () => hasLoadedInference.value,
+      (newValue) => {
+        if (newValue) {
           const dentalIndex = modules.value.findIndex(m => m.name === 'Dental');
           if (dentalIndex !== -1) {
             selectedModuleIndex.value = dentalIndex;

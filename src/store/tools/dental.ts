@@ -7,6 +7,7 @@ import { Manifest, StateFile } from '@/src/io/state-file/schema';
 import { Tags } from '@/src/core/dicomTags';
 import DicomChunkImage from '@/src/core/streaming/dicomChunkImage';
 import { useCurrentImage } from '@/src/composables/useCurrentImage';
+import { useToast } from '@/src/composables/useToast';
 import { useAnnotationTool } from './useAnnotationTool';
 import { useImageCacheStore } from '../image-cache';
 
@@ -278,6 +279,21 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
   }
 
   const inferenceData = ref<InferenceData>({});
+  const isLoadingInference = ref(false);
+  const hasLoadedInference = ref(false);
+
+  const clearInferenceData = () => {
+    console.log('Clearing dental inference data');
+
+    // Clear all existing dental tools
+    const toolsToRemove = [...dentalIDs.value];
+    toolsToRemove.forEach(id => {
+      removeDental(id);
+    });
+
+    // Clear inference data
+    inferenceData.value = {};
+  };
 
   const setInferenceData = (data: InferenceData, imageID?: string) => {
     console.log('Setting dental inference data:', data);
@@ -346,6 +362,8 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
   // --- API integration for inference results --- //
   const loadInferenceData = async () => {
     try {
+      isLoadingInference.value = true;
+      const toast = useToast();
       const currentImageID = useCurrentImage()?.currentImageID?.value;
       if (!currentImageID)
         return
@@ -378,9 +396,14 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
         };
       });
 
+      clearInferenceData();
+      toast.success('Dental inference data loaded!');
       setInferenceData(data, currentImageID);
+      hasLoadedInference.value = true;
     } catch (error) {
       console.error('Failed to fetch inference results:', error);
+    } finally {
+      isLoadingInference.value = false;
     }
   };
 
@@ -401,6 +424,8 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
     toolByID: dentalByID,
     tools: dentalTools,
     loadInferenceData,
+    isLoadingInference,
+    hasLoadedInference,
 
     dentalIDs,
     dentalByID,
@@ -414,6 +439,7 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
     calculateABLD,
     getToothPairs,
     setInferenceData,
+    clearInferenceData,
     inferenceData,
     serialize,
     deserialize,

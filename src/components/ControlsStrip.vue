@@ -132,7 +132,16 @@ const settingsDialog = ref(false);
 const messageDialog = ref(false);
 
 const dentalStore = useDentalStore();
-const { isLoadingInference } = storeToRefs(dentalStore);
+const { isLoadingInference, isLoadingSegmentation } = storeToRefs(dentalStore);
+
+async function handleGetSegmentation() {
+  isLoadingSegmentation.value = true;
+  try {
+    await getSegmentation();
+  } finally {
+    isLoadingSegmentation.value = false;
+  }
+}
 // const { icon: connIcon, url: serverUrl } = useServerConnection();
 // const layoutName = useViewLayout();
 const { handleSave, saveDialog, isSaving } = useSaveControls();
@@ -158,7 +167,7 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
     /> -->
     <div class="my-1 tool-separator" />
     <control-button size="40" icon="mdi-ruler-square" name="Measurement" :loading="isLoadingInference" @click="dentalStore.loadInferenceData()" />
-    <control-button size="40" icon="mdi-creation" name="Segmentation" @click="getSegmentation" />
+    <control-button size="40" icon="mdi-creation" name="Segmentation" :loading="isLoadingSegmentation" @click="handleGetSegmentation" />
     <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
       <template v-slot:activator="{ props }">

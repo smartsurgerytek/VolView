@@ -51,6 +51,7 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
 
   const inferenceData = ref<InferenceData>({});
   const isLoadingInference = ref(false);
+  const isLoadingSegmentation = ref(false);
   const hasLoadedInference = ref(false);
 
   // Track which images have loaded inference data
@@ -433,6 +434,7 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
     inferenceData,
     loadInferenceData,
     isLoadingInference,
+    isLoadingSegmentation,
     hasLoadedInference,
     loadedImageIDs,
     serialize,

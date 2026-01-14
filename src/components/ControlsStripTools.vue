@@ -49,6 +49,34 @@
         @click="toggle"
       />
     </groupable-item>
+    <control-button
+      icon="mdi-flip-vertical"
+      :name="`Flip Vertical [${nameToShortcut['FlipVertical']}]`"
+      :buttonClass="['tool-btn']"
+      :disabled="noCurrentImage"
+      @click="handleFlipVertical"
+    />
+    <control-button
+      icon="mdi-flip-horizontal"
+      :name="`Flip Horizontal [${nameToShortcut['FlipHorizontal']}]`"
+      :buttonClass="['tool-btn']"
+      :disabled="noCurrentImage"
+      @click="handleFlipHorizontal"
+    />
+    <control-button
+      icon="mdi-rotate-left"
+      :name="`Rotate Left [${nameToShortcut['RotateLeft']}]`"
+      :buttonClass="['tool-btn']"
+      :disabled="noCurrentImage"
+      @click="handleRotateLeft"
+    />
+    <control-button
+      icon="mdi-rotate-right"
+      :name="`Rotate Right [${nameToShortcut['RotateRight']}]`"
+      :buttonClass="['tool-btn']"
+      :disabled="noCurrentImage"
+      @click="handleRotateRight"
+    />
     <div class="my-1 tool-separator" />
     <groupable-item v-slot:default="{ active, toggle }" :value="Tools.Select">
       <control-button
@@ -157,6 +185,7 @@ import RectangleControls from '@/src/components/RectangleControls.vue';
 import PolygonControls from '@/src/components/PolygonControls.vue';
 import WindowLevelControls from '@/src/components/tools/windowing/WindowLevelControls.vue';
 import { actionToKey } from '@/src/composables/useKeyboardShortcuts';
+import { useImageTransform } from '@/src/composables/useImageTransform';
 
 export default defineComponent({
   components: {
@@ -176,6 +205,7 @@ export default defineComponent({
     const dataStore = useDatasetStore();
     const toolStore = useToolStore();
     const viewStore = useViewStore();
+    const imageTransform = useImageTransform();
 
     const noCurrentImage = computed(() => !dataStore.primaryDataset);
     const currentTool = computed(() => toolStore.currentTool);
@@ -211,6 +241,10 @@ export default defineComponent({
         Pan: keyMap.pan,
         Zoom: keyMap.zoom,
         Crosshairs: keyMap.crosshairs,
+        FlipVertical: keyMap.flipVertical,
+        FlipHorizontal: keyMap.flipHorizontal,
+        RotateLeft: keyMap.rotateLeft,
+        RotateRight: keyMap.rotateRight,
         Select: keyMap.select,
         Paint: keyMap.paint,
         Rectangle: keyMap.rectangle,
@@ -220,6 +254,23 @@ export default defineComponent({
         Dental: keyMap.dental,
       };
     });
+
+    // Image transformation handlers
+    const handleFlipVertical = () => {
+      imageTransform.flipVertical();
+    };
+
+    const handleFlipHorizontal = () => {
+      imageTransform.flipHorizontal();
+    };
+
+    const handleRotateLeft = () => {
+      imageTransform.rotateLeft();
+    };
+
+    const handleRotateRight = () => {
+      imageTransform.rotateRight();
+    };
 
     return {
       currentTool,
@@ -231,6 +282,10 @@ export default defineComponent({
       cropMenu,
       windowingMenu,
       nameToShortcut,
+      handleFlipVertical,
+      handleFlipHorizontal,
+      handleRotateLeft,
+      handleRotateRight,
     };
   },
 });

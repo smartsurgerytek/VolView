@@ -30,6 +30,10 @@ export const ToolStoreMap: Record<Tools, Maybe<() => IToolStore>> = {
   [Tools.Select]: null,
   [Tools.Crop]: useCropStore,
   [Tools.Crosshairs]: useCrosshairsToolStore,
+  [Tools.FlipHorizontal]: null,
+  [Tools.FlipVertical]: null,
+  [Tools.RotateRight]: null,
+  [Tools.RotateLeft]: null,
   [Tools.Paint]: usePaintToolStore,
   ...AnnotationToolStoreMap,
 } as const;

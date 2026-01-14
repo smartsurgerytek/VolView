@@ -202,6 +202,13 @@ import vtkMouseCameraTrackballPanManipulator from '@kitware/vtk.js/Interaction/M
 import vtkMouseCameraTrackballZoomToMouseManipulator from '@kitware/vtk.js/Interaction/Manipulators/MouseCameraTrackballZoomToMouseManipulator';
 import { useResetViewsEvents } from '@/src/components/tools/ResetViews.vue';
 import { onVTKEvent } from '@/src/composables/onVTKEvent';
+import {
+  useImageTransformEvents,
+  applyFlipHorizontal,
+  applyFlipVertical,
+  applyRotateRight,
+  applyRotateLeft,
+} from '@/src/composables/useImageTransform';
 
 interface Props extends LayoutViewProps {
   viewDirection: LPSAxisDir;
@@ -225,6 +232,21 @@ function resetCamera() {
 }
 
 useResetViewsEvents().onClick(resetCamera);
+
+// Image transformation event listeners
+const transformEvents = useImageTransformEvents();
+transformEvents.onFlipHorizontal(() => {
+  if (vtkView.value) applyFlipHorizontal(vtkView.value);
+});
+transformEvents.onFlipVertical(() => {
+  if (vtkView.value) applyFlipVertical(vtkView.value);
+});
+transformEvents.onRotateRight(() => {
+  if (vtkView.value) applyRotateRight(vtkView.value);
+});
+transformEvents.onRotateLeft(() => {
+  if (vtkView.value) applyRotateLeft(vtkView.value);
+});
 
 useWebGLWatchdog(vtkView);
 useViewAnimationListener(vtkView, viewId, viewType);

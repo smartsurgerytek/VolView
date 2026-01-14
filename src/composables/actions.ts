@@ -9,6 +9,7 @@ import { useKeyboardShortcutsStore } from '../store/keyboard-shortcuts';
 import { useCurrentImage } from './useCurrentImage';
 import { useSliceConfig } from './useSliceConfig';
 import { useDatasetStore } from '../store/datasets';
+import { useImageTransform } from './useImageTransform';
 
 const applyLabelOffset = (offset: number) => () => {
   const toolToStore = {
@@ -61,6 +62,26 @@ const deleteCurrentImage = () => () => {
   datasetStore.setPrimarySelection(datasetStore.idsAsSelections[0]);
 };
 
+const flipHorizontal = () => {
+  const { flipHorizontal: flip } = useImageTransform();
+  flip();
+};
+
+const flipVertical = () => {
+  const { flipVertical: flip } = useImageTransform();
+  flip();
+};
+
+const rotateRight = () => {
+  const { rotateRight: rotate } = useImageTransform();
+  rotate();
+};
+
+const rotateLeft = () => {
+  const { rotateLeft: rotate } = useImageTransform();
+  rotate();
+};
+
 export const ACTION_TO_FUNC = {
   windowLevel: setTool(Tools.WindowLevel),
   pan: setTool(Tools.Pan),
@@ -70,6 +91,10 @@ export const ACTION_TO_FUNC = {
   brushSize: NOOP, // act as modifier key rather than immediate effect, so no-op
   rectangle: setTool(Tools.Rectangle),
   crosshairs: setTool(Tools.Crosshairs),
+  flipHorizontal,
+  flipVertical,
+  rotateRight,
+  rotateLeft,
   temporaryCrosshairs: NOOP, // behavior implemented elsewhere
   crop: setTool(Tools.Crop),
   polygon: setTool(Tools.Polygon),

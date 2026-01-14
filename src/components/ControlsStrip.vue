@@ -145,7 +145,7 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
     <control-button size="40" icon="mdi-content-save-all" name="Save" :loading="isSaving" @click="handleSave" />
     <control-button size="40" icon="mdi-tray-arrow-down" name="Download" />
     <control-button size="40" icon="mdi-file-document-multiple" name="Record" @click="handleGenerateRecord" />
-    <div class="my-1 tool-separator" />
+    <!-- <div class="my-1 tool-separator" />
     <control-button
       size="40"
       icon="mdi-undo"
@@ -155,7 +155,7 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
       size="40"
       icon="mdi-redo"
       name="Redo"
-    />
+    /> -->
     <div class="my-1 tool-separator" />
     <control-button size="40" icon="mdi-ruler-square" name="Measurement" :loading="isLoadingInference" @click="dentalStore.loadInferenceData()" />
     <control-button size="40" icon="mdi-creation" name="Segmentation" @click="getSegmentation" />

@@ -1,16 +1,11 @@
 import { computed } from 'vue';
 import { defineAnnotationToolStore } from '@/src/utils/defineAnnotationToolStore';
 import type { Vector3 } from '@kitware/vtk.js/types';
-// import { distance2BetweenPoints } from '@kitware/vtk.js/Common/Core/Math';
 import { ToolID } from '@/src/types/annotation-tool';
-
 import { RULER_LABEL_DEFAULTS } from '@/src/config';
 import { Manifest, StateFile } from '@/src/io/state-file/schema';
-
-import DicomChunkImage from '@/src/core/streaming/dicomChunkImage';
-import { Tags } from '@/src/core/dicomTags';
+import { getPixelSpacing } from '@/src/utils/dicomMetadata';
 import { useAnnotationTool } from './useAnnotationTool';
-import { useImageCacheStore } from '../image-cache';
 
 const rulerDefaults = () => ({
   firstPoint: [0, 0, 0] as Vector3,
@@ -18,30 +13,6 @@ const rulerDefaults = () => ({
   id: '',
   name: 'Ruler',
 });
-
-function getPixelSpacing(currentImageID: string): number[] {
-    const imageCacheStore = useImageCacheStore();
-
-    const spacing: number[] = [1, 1, 1];
-    const image = imageCacheStore.imageById[currentImageID];
-
-    if (image instanceof DicomChunkImage) {
-        const metaPairs = image.getDicomMetadata();
-        if (metaPairs) {
-            const metadata = Object.fromEntries(metaPairs);
-            const pixelSpacingStr = metadata[Tags.PixelSpacing];
-
-            const pixelSpacing = pixelSpacingStr.split('\\');
-
-            if (pixelSpacing.length > 0) {
-                spacing[0] = parseFloat(pixelSpacing[0])
-                spacing[1] = parseFloat(pixelSpacing[1])
-            }
-        }
-    }
-
-    return spacing;
-}
 
 export const useRulerStore = defineAnnotationToolStore('ruler', () => {
   const annotationTool = useAnnotationTool({

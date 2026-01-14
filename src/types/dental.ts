@@ -1,21 +1,30 @@
-import { Vector3 } from "@kitware/vtk.js/types";
+import type { Vector3 } from '@kitware/vtk.js/types';
 
-export interface DentalLine {
-  id: string;
-  type: 'CAL' | 'TRL';
-  startPoint: Vector3;
-  endPoint: Vector3;
-  toothId: string;
-  pairId: string;
+/**
+ * Represents a pair of TRL and CAL measurement points.
+ */
+export interface TRLCALPair {
+  trl: {
+    firstPoint: Vector3 | number[];
+    secondPoint: Vector3 | number[];
+  };
+  cal: {
+    firstPoint: Vector3 | number[];
+    secondPoint: Vector3 | number[];
+  };
 }
 
+/**
+ * Represents measurement data for a single tooth.
+ */
 export interface ToothData {
-  id: string;
-  centerPoint: Vector3;
-  lines: DentalLine[];
-  trlCalPairs: Array<{
-    trl: DentalLine;
-    cal: DentalLine;
-    abld: number;
-  }>;
+  centerPosition?: Vector3 | number[];
+  trlCalPairs?: TRLCALPair[];
+}
+
+/**
+ * Inference data structure containing all tooth measurements.
+ */
+export interface InferenceData {
+  teeth?: Record<string, ToothData>;
 }

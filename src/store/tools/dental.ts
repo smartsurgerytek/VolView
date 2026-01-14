@@ -217,6 +217,10 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
       const trlLabelId = trlLabelEntry ? trlLabelEntry[0] : '';
       const calLabelId = calLabelEntry ? calLabelEntry[0] : '';
 
+      // Get colors from DENTAL_LABEL_DEFAULTS as fallback
+      const trlDefaults = DENTAL_LABEL_DEFAULTS.TRL;
+      const calDefaults = DENTAL_LABEL_DEFAULTS.CAL;
+
       Object.entries(data.teeth).forEach(([toothId, toothData]) => {
         if (toothData.trlCalPairs) {
           toothData.trlCalPairs.forEach((pair, index) => {
@@ -241,7 +245,10 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
                 slice: 0,
                 label: trlLabelId,
                 placing: false,
-                ...(trlLabelId && annotationTool.labels.value[trlLabelId]),
+                // Use label props if available, otherwise use defaults
+                ...(trlLabelId
+                  ? annotationTool.labels.value[trlLabelId]
+                  : trlDefaults),
               });
             }
 
@@ -258,7 +265,10 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
                 slice: 0,
                 label: calLabelId,
                 placing: false,
-                ...(calLabelId && annotationTool.labels.value[calLabelId]),
+                // Use label props if available, otherwise use defaults
+                ...(calLabelId
+                  ? annotationTool.labels.value[calLabelId]
+                  : calDefaults),
               });
             }
           });
@@ -352,6 +362,51 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
 
   function deserialize(manifest: Manifest, dataIDMap: Record<string, string>) {
     deserializeTools(manifest.tools.dental, dataIDMap);
+
+    // Enable the dental module if there are dental tools in the manifest
+    if (manifest.tools.dental?.tools?.length) {
+      hasLoadedInference.value = true;
+
+      // Rebuild inferenceData from deserialized tools
+      const rebuiltData: InferenceData = { teeth: {} };
+
+      manifest.tools.dental.tools.forEach((tool) => {
+        const mappedImageID = dataIDMap[tool.imageID] || tool.imageID;
+        loadedImageIDs.value.add(mappedImageID);
+
+        const { toothId, pairId, type, firstPoint, secondPoint } = tool;
+
+        // Initialize tooth data if not exists
+        if (!rebuiltData.teeth![toothId]) {
+          rebuiltData.teeth![toothId] = {
+            centerPosition: undefined,
+            trlCalPairs: [],
+          };
+        }
+
+        // Extract pair index from pairId (format: "toothId_index")
+        const pairIndex = parseInt(pairId.split('_').pop() || '0', 10);
+
+        // Ensure the pair array is long enough
+        const toothData = rebuiltData.teeth![toothId];
+        while (toothData.trlCalPairs!.length <= pairIndex) {
+          toothData.trlCalPairs!.push({
+            trl: { firstPoint: [0, 0, 0], secondPoint: [0, 0, 0] },
+            cal: { firstPoint: [0, 0, 0], secondPoint: [0, 0, 0] },
+          });
+        }
+
+        // Set TRL or CAL data based on type
+        const pair = toothData.trlCalPairs![pairIndex];
+        if (type === 'TRL') {
+          pair.trl = { firstPoint, secondPoint };
+        } else if (type === 'CAL') {
+          pair.cal = { firstPoint, secondPoint };
+        }
+      });
+
+      inferenceData.value = rebuiltData;
+    }
   }
 
   // --- Return Store Interface --- //

@@ -5,6 +5,7 @@ export enum AnnotationToolType {
   Rectangle = 'Rectangle',
   Ruler = 'Ruler',
   Polygon = 'Polygon',
+  Dental = 'Dental',
 }
 
 export enum Tools {
@@ -18,6 +19,7 @@ export enum Tools {
   Rectangle = 'Rectangle',
   Ruler = 'Ruler',
   Polygon = 'Polygon',
+  Dental = 'Dental',
 }
 
 export interface IActivatableTool {

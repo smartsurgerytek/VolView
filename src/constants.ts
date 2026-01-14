@@ -93,6 +93,9 @@ export const ACTIONS = {
   showKeyboardShortcuts: {
     readable: 'Show keyboard shortcuts dialog',
   },
+  dental: {
+    readable: 'Activate Dental tool',
+  },
 } as const;
 
 export type Action = keyof typeof ACTIONS;

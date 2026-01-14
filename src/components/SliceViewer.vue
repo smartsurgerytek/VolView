@@ -141,6 +141,11 @@
             :image-id="currentImageID"
             :view-direction="viewDirection"
           />
+          <dental-tool  
+            :view-id="viewId"  
+            :image-id="currentImageID"  
+            :view-direction="viewDirection"  
+          />
           <select-tool />
           <svg class="overlay-no-events">
             <bounding-rectangle :points="selectionPoints" />
@@ -173,6 +178,7 @@ import { useSegmentGroupStore } from '@/src/store/segmentGroups';
 import VtkLayerSliceRepresentation from '@/src/components/vtk/VtkLayerSliceRepresentation.vue';
 import { useViewAnimationListener } from '@/src/composables/useViewAnimationListener';
 import CropTool from '@/src/components/tools/crop/CropTool.vue';
+import DentalTool from '@/src/components/tools/dental/DentalTool.vue';
 import CrosshairsTool from '@/src/components/tools/crosshairs/CrosshairsTool.vue';
 import PaintTool from '@/src/components/tools/paint/PaintTool.vue';
 import PolygonTool from '@/src/components/tools/polygon/PolygonTool.vue';

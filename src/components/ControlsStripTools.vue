@@ -107,6 +107,18 @@
         <ruler-controls />
       </menu-control-button>
     </groupable-item>
+    <groupable-item v-slot:default="{ active, toggle }" :value="Tools.Dental">
+      <menu-control-button
+        icon="mdi-tooth"
+        :name="`Dental [${nameToShortcut['Dental']}]`"
+        :mobileOnlyMenu="true"
+        :active="active"
+        :disabled="noCurrentImage || isObliqueLayout"
+        @click="toggle"
+      >
+        <dental-controls />
+      </menu-control-button>
+    </groupable-item>
 
     <div class="my-1 tool-separator" />
     <groupable-item v-slot:default="{ active, toggle }" :value="Tools.Crop">
@@ -140,6 +152,7 @@ import MenuControlButton from '@/src/components/MenuControlButton.vue';
 import CropControls from '@/src/components/tools/crop/CropControls.vue';
 import ResetViews from '@/src/components/tools/ResetViews.vue';
 import RulerControls from '@/src/components/RulerControls.vue';
+import DentalControls from '@/src/components/DentalControls.vue';
 import RectangleControls from '@/src/components/RectangleControls.vue';
 import PolygonControls from '@/src/components/PolygonControls.vue';
 import WindowLevelControls from '@/src/components/tools/windowing/WindowLevelControls.vue';
@@ -151,6 +164,7 @@ export default defineComponent({
     MenuControlButton,
     ItemGroup,
     GroupableItem,
+    DentalControls,
     CropControls,
     ResetViews,
     RulerControls,
@@ -203,6 +217,7 @@ export default defineComponent({
         Polygon: keyMap.polygon,
         Ruler: keyMap.ruler,
         Crop: keyMap.crop,
+        Dental: keyMap.dental,
       };
     });
 

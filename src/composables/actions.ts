@@ -74,6 +74,7 @@ export const ACTION_TO_FUNC = {
   crop: setTool(Tools.Crop),
   polygon: setTool(Tools.Polygon),
   select: setTool(Tools.Select),
+  dental: setTool(Tools.Dental),
 
   nextSlice: changeSlice(1),
   previousSlice: changeSlice(-1),

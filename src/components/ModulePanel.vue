@@ -50,6 +50,7 @@ import ServerModule from './ServerModule.vue';
 import ProbeView from './ProbeView.vue';
 import { useToolStore } from '../store/tools';
 import { Tools } from '../store/tools/types';
+import DentalModule from './DentalModule.vue';
 
 interface Module {
   name: string;
@@ -79,6 +80,11 @@ const Modules: Module[] = [
     icon: 'server-network',
     component: ServerModule,
   },
+  {
+    name: 'Dental',
+    icon: 'tooth',
+    component: DentalModule,
+  },
 ];
 
 const autoSwitchToAnnotationsTools = [
@@ -88,6 +94,11 @@ const autoSwitchToAnnotationsTools = [
   Tools.Paint,
 ];
 
+const autoSwitchToDentalTools = [
+  Tools.Dental,
+];
+
+
 export default defineComponent({
   name: 'ModulePanel',
   components: { ProbeView },
@@ -95,13 +106,6 @@ export default defineComponent({
     const selectedModuleIndex = ref(0);
 
     const toolStore = useToolStore();
-    watch(
-      () => toolStore.currentTool,
-      (newTool) => {
-        if (autoSwitchToAnnotationsTools.includes(newTool))
-          selectedModuleIndex.value = 1;
-      }
-    );
 
     const serverStore = useServerStore();
     const modules = computed(() => {
@@ -120,6 +124,22 @@ export default defineComponent({
         return m;
       });
     });
+
+    watch(
+      () => toolStore.currentTool,
+      (newTool) => {
+        if (autoSwitchToAnnotationsTools.includes(newTool)) {
+          selectedModuleIndex.value = 1;
+        }
+        if (autoSwitchToDentalTools.includes(newTool)) {
+          // Find the Dental module index dynamically
+          const dentalIndex = modules.value.findIndex(m => m.name === 'Dental');
+          if (dentalIndex !== -1) {
+            selectedModuleIndex.value = dentalIndex;
+          }
+        }
+      }
+    );
 
     return {
       selectedModuleIndex,

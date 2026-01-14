@@ -53,6 +53,9 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
   const isLoadingInference = ref(false);
   const hasLoadedInference = ref(false);
 
+  // Track which images have loaded inference data
+  const loadedImageIDs = ref<Set<string>>(new Set());
+
   // --- Computed Properties --- //
 
   /**
@@ -161,16 +164,36 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
   }
 
   /**
-   * Clears all dental measurements and inference data.
+   * Clears dental measurements and inference data for a specific image.
+   * If no imageID is provided, clears all data.
+   *
+   * @param imageID - Optional image ID to clear data for
    */
-  const clearInferenceData = () => {
-    console.log('Clearing dental inference data');
+  const clearInferenceData = (imageID?: string) => {
+    console.log('Clearing dental inference data', imageID ? `for image: ${imageID}` : 'for all images');
 
-    // Remove all existing dental tools
-    const toolsToRemove = [...dentalIDs.value];
-    toolsToRemove.forEach((id) => {
-      removeDental(id);
-    });
+    if (imageID) {
+      // Remove only dental tools for the specified image
+      const toolsToRemove = dentalTools.value
+        .filter((tool) => tool.imageID === imageID)
+        .map((tool) => tool.id);
+
+      toolsToRemove.forEach((id) => {
+        removeDental(id);
+      });
+
+      // Remove from loaded images set
+      loadedImageIDs.value.delete(imageID);
+    } else {
+      // Remove all existing dental tools
+      const toolsToRemove = [...dentalIDs.value];
+      toolsToRemove.forEach((id) => {
+        removeDental(id);
+      });
+
+      // Clear all loaded images
+      loadedImageIDs.value.clear();
+    }
 
     // Clear inference data
     inferenceData.value = {};
@@ -282,7 +305,8 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
    * Loads dental inference data from the API for the current image.
    *
    * Fetches measurements, transforms them to the internal format,
-   * and creates dental measurement tools.
+   * and creates dental measurement tools. Automatically replaces
+   * existing measurements for the image.
    */
   const loadInferenceData = async () => {
     try {
@@ -304,10 +328,15 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
 
       const data = transformMeasurementsToInferenceData(measurements);
 
-      clearInferenceData();
+      // Clear existing data for this image before loading new data
+      // This ensures we replace old measurements with fresh API data
+      clearInferenceData(currentImageID);
       toast.success('Dental inference data loaded!');
       setInferenceData(data, currentImageID);
       hasLoadedInference.value = true;
+
+      // Mark this image as having loaded data
+      loadedImageIDs.value.add(currentImageID);
     } catch (error) {
       console.error('Failed to fetch inference results:', error);
     } finally {
@@ -350,6 +379,7 @@ export const useDentalStore = defineAnnotationToolStore('dental', () => {
     loadInferenceData,
     isLoadingInference,
     hasLoadedInference,
+    loadedImageIDs,
     serialize,
     deserialize,
   };

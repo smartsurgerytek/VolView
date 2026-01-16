@@ -258,7 +258,7 @@ async def fetch_segmentation_zip(
     study_uid: str
 ) -> bytes:
     try:
-        print("ABPAPI_URL value =", settings.ABPAPI_URL)
+        print("---------------ABPAPI_URL---------", settings.ABPAPI_URL)
 
         async with httpx.AsyncClient(verify=False) as client:
             seg_resp = await client.get(

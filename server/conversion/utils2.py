@@ -225,8 +225,7 @@ async def create_volview_zip_from_memory(
                 subject_ds = client.retrieve_instance(
                     study_instance_uid=subject_files[filename][2],
                     series_instance_uid=subject_files[filename][1],
-                    sop_instance_uid=subject_files[filename][0],
-                    media_types=('application/dicom',)
+                    sop_instance_uid=subject_files[filename][0],                    
                 )
         
                 with io.BytesIO() as dcm_buffer:
@@ -259,6 +258,8 @@ async def fetch_segmentation_zip(
     study_uid: str
 ) -> bytes:
     try:
+        print("ABPAPI_URL value =", settings.ABPAPI_URL)
+
         async with httpx.AsyncClient(verify=False) as client:
             seg_resp = await client.get(
                 f"{settings.ABPAPI_URL}/segmentation/{study_uid}"

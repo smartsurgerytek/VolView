@@ -3,7 +3,7 @@ name: Deploy VolView Services (Cloud Run - Integration)
 on:
   push:
     branches:      
-      - 'FOND-182-setupiDental-on-foundation'
+      - 'deploy-sgementation-feature'
 
 env:
   PROJECT_ID: foundation-465306

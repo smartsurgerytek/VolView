@@ -8,6 +8,7 @@
     :min-width="sizeV"
     :max-width="sizeV"
     :class="classV"
+    :loading="loading"
     v-bind="$attrs"
   >
     <v-icon :size="iconSize">{{ icon }}</v-icon>
@@ -31,6 +32,7 @@ export default {
     size: { type: [Number, String], default: 40 },
     buttonClass: [String, Array, Object],
     tooltipLocation: { type: String, default: 'right' },
+    loading: { type: Boolean, default: false },
   },
 
   computed: {

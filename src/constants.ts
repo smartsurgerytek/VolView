@@ -47,6 +47,18 @@ export const ACTIONS = {
   crosshairs: {
     readable: 'Activate Crosshairs tool',
   },
+  flipHorizontal: {
+    readable: 'Flip image horizontally',
+  },
+  flipVertical: {
+    readable: 'Flip image vertically',
+  },
+  rotateRight: {
+    readable: 'Rotate image 90 degrees clockwise',
+  },
+  rotateLeft: {
+    readable: 'Rotate image 90 degrees counter-clockwise',
+  },
   temporaryCrosshairs: {
     readable: 'Temporarily activate crosshairs tool',
   },
@@ -92,6 +104,9 @@ export const ACTIONS = {
 
   showKeyboardShortcuts: {
     readable: 'Show keyboard shortcuts dialog',
+  },
+  dental: {
+    readable: 'Activate Dental tool',
   },
 } as const;
 

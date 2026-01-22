@@ -43,6 +43,7 @@
 import { Component, computed, defineComponent, ref, watch } from 'vue';
 
 import { ConnectionState, useServerStore } from '@/src/store/server';
+import { storeToRefs } from 'pinia';
 import DataBrowser from './DataBrowser.vue';
 import RenderingModule from './RenderingModule.vue';
 import AnnotationsModule from './AnnotationsModule.vue';
@@ -50,6 +51,8 @@ import ServerModule from './ServerModule.vue';
 import ProbeView from './ProbeView.vue';
 import { useToolStore } from '../store/tools';
 import { Tools } from '../store/tools/types';
+import DentalModule from './DentalModule.vue';
+import { useDentalStore } from '../store/tools/dental';
 
 interface Module {
   name: string;
@@ -79,6 +82,11 @@ const Modules: Module[] = [
     icon: 'server-network',
     component: ServerModule,
   },
+  {
+    name: 'Dental',
+    icon: 'tooth',
+    component: DentalModule,
+  },
 ];
 
 const autoSwitchToAnnotationsTools = [
@@ -88,6 +96,11 @@ const autoSwitchToAnnotationsTools = [
   Tools.Paint,
 ];
 
+const autoSwitchToDentalTools = [
+  Tools.Dental,
+];
+
+
 export default defineComponent({
   name: 'ModulePanel',
   components: { ProbeView },
@@ -95,31 +108,56 @@ export default defineComponent({
     const selectedModuleIndex = ref(0);
 
     const toolStore = useToolStore();
-    watch(
-      () => toolStore.currentTool,
-      (newTool) => {
-        if (autoSwitchToAnnotationsTools.includes(newTool))
-          selectedModuleIndex.value = 1;
-      }
-    );
+    const dentalStore = useDentalStore();
+    const { hasLoadedInference } = storeToRefs(dentalStore);
 
     const serverStore = useServerStore();
     const modules = computed(() => {
+      let moduleList = Modules;
+
       if (!serverStore.url) {
-        return Modules.filter((m) => m.name !== 'Remote');
+        moduleList = Modules.filter((m) => m.name !== 'Remote');
       }
 
-      if (serverStore.connState === ConnectionState.Connected) {
-        return Modules;
-      }
-
-      return Modules.map((m) => {
-        if (m.name === 'Remote') {
+      return moduleList.map((m) => {
+        if (m.name === 'Remote' && serverStore.connState !== ConnectionState.Connected) {
+          return { ...m, disabled: true };
+        }
+        if (m.name === 'Dental' && !hasLoadedInference.value) {
           return { ...m, disabled: true };
         }
         return m;
       });
     });
+
+    watch(
+      () => toolStore.currentTool,
+      (newTool) => {
+        if (autoSwitchToAnnotationsTools.includes(newTool)) {
+          selectedModuleIndex.value = 1;
+        }
+        if (autoSwitchToDentalTools.includes(newTool)) {
+          // Find the Dental module index dynamically
+          const dentalIndex = modules.value.findIndex(m => m.name === 'Dental');
+          if (dentalIndex !== -1) {
+            selectedModuleIndex.value = dentalIndex;
+          }
+        }
+      }
+    );
+
+    // Watch for when inference data is first loaded, then switch to Dental tab
+    watch(
+      () => hasLoadedInference.value,
+      (newValue) => {
+        if (newValue) {
+          const dentalIndex = modules.value.findIndex(m => m.name === 'Dental');
+          if (dentalIndex !== -1) {
+            selectedModuleIndex.value = dentalIndex;
+          }
+        }
+      }
+    );
 
     return {
       selectedModuleIndex,

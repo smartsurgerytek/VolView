@@ -249,6 +249,11 @@ export const POLYGON_LABEL_DEFAULTS = {
   'Label 1': { color: 'red' },
 };
 
+export const DENTAL_LABEL_DEFAULTS = {
+  'TRL': { color: '#FF6B6B', strokeWidth: 2 },
+  'CAL': { color: '#4ECDC4', strokeWidth: 2 },
+};
+
 export const DEFAULT_PRESET_BY_MODALITY: Record<string, string> = {
   CT: 'CT-AAA',
   MR: 'CT-Coronary-Arteries-2',
@@ -272,11 +277,16 @@ export const ACTION_TO_KEY = {
   brushSize: 'ctrl',
   rectangle: 'r',
   crosshairs: 'c',
+  flipVertical: 'v',
+  flipHorizontal: 'h',
+  rotateLeft: '[',
+  rotateRight: ']',
   temporaryCrosshairs: 'shift-c',
   crop: 'b',
   polygon: 'g',
   mergeNewPolygon: 'Shift',
   select: 's',
+  dental: 't',
 
   nextSlice: 'arrowdown',
   previousSlice: 'arrowup',

@@ -1,22 +1,26 @@
 import os
 
-# 1. Start with Localhost as the base
-DICOMWEB_URL: str = "http://localhost:8080/dicom-web"
-ABPAPI_URL: str = "https://localhost:44373/api/volview"
+# 1. Start with Localhost as the base (defaults)
+DEFAULT_DICOMWEB_URL: str = "http://localhost:8080/dicom-web"
+DEFAULT_ABPAPI_URL: str = "https://localhost:44373/api/volview"
 
 python_env = os.getenv("PYTHON_ENV")
 print(f"DEBUG: PYTHON_ENV is set to: {python_env}")
 
-# 2. If Integration, TRY to overwrite them
+# 2. Check for environment variable overrides first (for Docker/production)
+DICOMWEB_URL: str = os.getenv("DICOMWEB_URL", DEFAULT_DICOMWEB_URL)
+ABPAPI_URL: str = os.getenv("ABPAPI_URL", DEFAULT_ABPAPI_URL)
+
+# 3. If Integration, TRY to overwrite them from settings file
 if python_env == "Integration":
     try:
         # Import the cloud variables from your new file
         from .settings_integration import DICOMWEB_URL as CLOUD_DICOM, ABPAPI_URL as CLOUD_ABP
-        
+
         # ASSIGN the cloud values to the main variables
         DICOMWEB_URL = CLOUD_DICOM
         ABPAPI_URL = CLOUD_ABP
-        
+
         print(f"DEBUG: Successfully loaded Integration settings. DICOM URL is now: {DICOMWEB_URL}")
     except ImportError as e:
         print(f"DEBUG: Integration settings file not found. Error: {e}")

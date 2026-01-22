@@ -359,6 +359,18 @@ const Polygon = annotationTool.extend({
 
 const Polygons = makeToolEntry(Polygon);
 
+const DentalType = z.union([z.literal('TRL'), z.literal('CAL')]);
+
+const Dental = annotationTool.extend({
+  firstPoint: Vector3,
+  secondPoint: Vector3,
+  type: DentalType,
+  toothId: z.string(),
+  pairId: z.string(),
+});
+
+const Dentals = makeToolEntry(Dental);
+
 const Crosshairs = z.object({
   position: Vector3,
 });
@@ -391,6 +403,7 @@ const Tools = z.object({
   paint: Paint,
   crop: Cropping,
   current: ToolsEnumNative,
+  dental: Dentals.optional(),
 });
 
 export type Tools = z.infer<typeof Tools>;

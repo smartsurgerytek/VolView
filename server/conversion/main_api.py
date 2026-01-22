@@ -41,6 +41,7 @@ from utils1 import (
 
 from utils2 import (
     Rulers,
+    Dentals,
     Tools,
     Layout,
     ViewerSession,
@@ -234,7 +235,8 @@ async def load_session(request: Request):
                     current="Ruler",
                     polygons={"tools": [], "labels": {}},
                     rectangles={"tools": [], "labels": {}},
-                    rulers= Rulers(tools=[], labels={}),
+                    rulers=Rulers(tools=[], labels={}),
+                    dental=Dentals(tools=[], labels={}),
                     ),
                 layout=Layout(name="Axial Only", direction="H", items=["Axial"]),
                 views=[],
@@ -324,7 +326,8 @@ async def load_session_with_anno(request: Request):
                 current="Ruler",
                 polygons={"tools": [], "labels": {}},
                 rectangles={"tools": [], "labels": {}},
-                rulers= Rulers(tools=measurement_data, labels={}),
+                rulers=Rulers(tools=measurement_data, labels={}),
+                dental=Dentals(tools=[], labels={}),
                 )
             viewer_session = ViewerSession(
                 version="5.0.1",

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 // import { watch } from 'vue';
 // import { loadUserPromptedFiles } from '@/src/actions/loadUserFiles';
 import useRemoteSaveStateStore from '@/src/store/remote-save-state';
@@ -11,15 +11,15 @@ import MessageNotifications from '@/src/components/MessageNotifications.vue';
 import Settings from '@/src/components/Settings.vue';
 import ControlsStripTools from '@/src/components/ControlsStripTools.vue';
 import MessageCenter from '@/src/components/MessageCenter.vue';
-import { MessageType, useMessageStore } from '@/src/store/messages';
-import { ConnectionState, useServerStore } from '@/src/store/server';
+// import { MessageType, useMessageStore } from '@/src/store/messages';
+// import { ConnectionState, useServerStore } from '@/src/store/server';
 // import { useViewStore } from '@/src/store/views';
 // import { Layouts, DefaultLayoutName } from '@/src/config';
-import { getMeasurement } from '../store/tools/measurement';
 // import { useDatasetStore } from '../store/datasets';
 import { useImageSelectionStore } from '../store/image-selection';
 import { generateRecord } from '../actions/generateRecord';
 import { getSegmentation } from '../store/tools/segmentation';
+import { useDentalStore } from '../store/tools/dental';
 
 interface Props {
   hasData: boolean;
@@ -73,52 +73,54 @@ function useSaveControls() {
   return { handleSave, isSaving, saveDialog };
 }
 
-function useMessageBubble() {
-  const messageStore = useMessageStore();
-  const count = computed(() => messageStore.importantMessages.length);
-  const badgeColor = computed(() => {
-    if (
-      messageStore.importantMessages.find(
-        (msg) => msg.type === MessageType.Error
-      )
-    ) {
-      return 'error';
-    }
-    if (
-      messageStore.importantMessages.find(
-        (msg) => msg.type === MessageType.Warning
-      )
-    ) {
-      return 'warning';
-    }
-    return 'primary';
-  });
+// function useMessageBubble() {
+//   const messageStore = useMessageStore();
+//   const count = computed(() => messageStore.importantMessages.length);
+//   const badgeColor = computed(() => {
+//     if (
+//       messageStore.importantMessages.find(
+//         (msg) => msg.type === MessageType.Error
+//       )
+//     ) {
+//       return 'error';
+//     }
+//     if (
+//       messageStore.importantMessages.find(
+//         (msg) => msg.type === MessageType.Warning
+//       )
+//     ) {
+//       return 'warning';
+//     }
+//     return 'primary';
+//   });
 
-  return { count, badgeColor };
-}
+//   return { count, badgeColor };
+// }
 
-function useServerConnection() {
-  const serverStore = useServerStore();
 
-  const icon = computed(() => {
-    switch (serverStore.connState) {
-      case ConnectionState.Connected:
-        return 'mdi-lan-check';
-      case ConnectionState.Disconnected:
-        return 'mdi-lan-disconnect';
-      case ConnectionState.Pending:
-        return 'mdi-lan-pending';
-      default:
-        throw new Error('Invalid connection state');
-    }
-  });
+// function useServerConnection() {
+//   const serverStore = useServerStore();
 
-  const { url } = storeToRefs(serverStore);
+//   const icon = computed(() => {
+//     switch (serverStore.connState) {
+//       case ConnectionState.Connected:
+//         return 'mdi-lan-check';
+//       case ConnectionState.Disconnected:
+//         return 'mdi-lan-disconnect';
+//       case ConnectionState.Pending:
+//         return 'mdi-lan-pending';
+//       default:
+//         throw new Error('Invalid connection state');
+//     }
+//   });
 
-  return { icon, url };
-}
+//   const { url } = storeToRefs(serverStore);
+
+//   return { icon, url };
+// }
 
 // const dataStore = useDatasetStore();
+
 const imageSelectionStore = useImageSelectionStore();
 const { selectedImageIDs: selected } = storeToRefs(imageSelectionStore);
 
@@ -128,6 +130,18 @@ function handleGenerateRecord() {
 
 const settingsDialog = ref(false);
 const messageDialog = ref(false);
+
+const dentalStore = useDentalStore();
+const { isLoadingInference, isLoadingSegmentation } = storeToRefs(dentalStore);
+
+async function handleGetSegmentation() {
+  isLoadingSegmentation.value = true;
+  try {
+    await getSegmentation();
+  } finally {
+    isLoadingSegmentation.value = false;
+  }
+}
 // const { icon: connIcon, url: serverUrl } = useServerConnection();
 // const layoutName = useViewLayout();
 const { handleSave, saveDialog, isSaving } = useSaveControls();
@@ -140,12 +154,20 @@ const { handleSave, saveDialog, isSaving } = useSaveControls();
     <control-button size="40" icon="mdi-content-save-all" name="Save" :loading="isSaving" @click="handleSave" />
     <control-button size="40" icon="mdi-tray-arrow-down" name="Download" />
     <control-button size="40" icon="mdi-file-document-multiple" name="Record" @click="handleGenerateRecord" />
+    <!-- <div class="my-1 tool-separator" />
+    <control-button
+      size="40"
+      icon="mdi-undo"
+      name="u=Undo"
+    />
+    <control-button
+      size="40"
+      icon="mdi-redo"
+      name="Redo"
+    /> -->
     <div class="my-1 tool-separator" />
-    <control-button size="40" icon="mdi-undo" name="u=Undo" @click="" />
-    <control-button size="40" icon="mdi-redo" name="Redo" @click="" />
-    <div class="my-1 tool-separator" />
-    <control-button size="40" icon="mdi-ruler-square" name="Measurement" @click="getMeasurement" />
-    <control-button size="40" icon="mdi-creation" name="Segmentation" @click="getSegmentation" />
+    <control-button size="40" icon="mdi-ruler-square" name="Measurement" :loading="isLoadingInference" @click="dentalStore.loadInferenceData()" />
+    <control-button size="40" icon="mdi-creation" name="Segmentation" :loading="isLoadingSegmentation" @click="handleGetSegmentation" />
     <!-- <div class="my-1 tool-separator" />
     <v-menu location="right" :close-on-content-click="true">
       <template v-slot:activator="{ props }">

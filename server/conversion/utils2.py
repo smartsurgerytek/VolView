@@ -68,6 +68,29 @@ class Rulers(BaseModel):
     tools: List[Ruler]
     labels: Dict[str, ToolLabel]
 
+class Dental(BaseModel):
+    """Model defining a single dental measurement (TRL or CAL)"""
+    imageID: str
+    frameOfReference: FrameOfReference
+    slice_val: int = Field(alias='slice')
+    placing: Optional[bool] = False
+    color: str
+    strokeWidth: Optional[int] = 2
+    name: str
+    firstPoint: Tuple[float, float, float]
+    secondPoint: Tuple[float, float, float]
+    id: str
+    label: Optional[str] = None
+    labelName: Optional[str] = None
+    type: str  # 'TRL' or 'CAL'
+    toothId: str
+    pairId: str
+
+class Dentals(BaseModel):
+    """Model for dental tools collection"""
+    tools: List[Dental]
+    labels: Dict[str, Any]  # Labels can have partial ToolLabel data
+
 class Tools(BaseModel):
     """Top-level model combining all tools"""
     crosshairs: Crosshairs
@@ -77,7 +100,8 @@ class Tools(BaseModel):
     polygons: Polygons
     rectangles: Rectangles
     rulers: Rulers
-
+    dental: Dentals
+    
 # --- Data Source ---
 
 class Dataset(BaseModel):

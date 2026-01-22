@@ -5,6 +5,7 @@ export enum AnnotationToolType {
   Rectangle = 'Rectangle',
   Ruler = 'Ruler',
   Polygon = 'Polygon',
+  Dental = 'Dental',
 }
 
 export enum Tools {
@@ -15,9 +16,14 @@ export enum Tools {
   Paint = 'Paint',
   Select = 'Select',
   Crosshairs = 'Crosshairs',
+  FlipVertical = 'FlipVertical',
+  FlipHorizontal = 'FlipHorizontal',
+  RotateRight = 'RotateRight',
+  RotateLeft = 'RotateLeft',
   Rectangle = 'Rectangle',
   Ruler = 'Ruler',
   Polygon = 'Polygon',
+  Dental = 'Dental',
 }
 
 export interface IActivatableTool {

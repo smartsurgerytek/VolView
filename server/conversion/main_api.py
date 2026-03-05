@@ -212,8 +212,8 @@ async def load_session(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
 
-            # simulate datasetid
-            datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
+            # simulate datasetid (use SOPInstanceUID to guarantee uniqueness per instance)
+            datasetId = f"{ds.get('SOPInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
             dataset_uids.append(datasetId)
 
             subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
@@ -284,6 +284,21 @@ async def load_session_with_anno(request: Request):
         subject_files = {}
         measurement_data = []
 
+        # Try to fetch stored manifest from C# DB directly (independent of SR detection,
+        # since the SR is created asynchronously and may not be in PACS yet when user reloads)
+        viewer_session = None
+        try:
+            abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
+            manifest_response = await apiClient.get(str(abpapi_url))
+            manifest_response.raise_for_status()
+            manifest_text = manifest_response.text
+            if manifest_text and manifest_text.strip():
+                viewer_session = ViewerSession(**manifest_response.json())
+                print("Stored manifest found in C# DB.")
+        except Exception as e:
+            print(f"No stored manifest found in C# DB (or parse error): {e}")
+            viewer_session = None
+
         for instance in instances:
             ds = client.retrieve_instance(
                 study_instance_uid=instance.get('0020000D')['Value'][0],
@@ -291,33 +306,49 @@ async def load_session_with_anno(request: Request):
                 sop_instance_uid=instance.get('00080018')['Value'][0],
             )
 
-            # simulate datasetid
+            # simulate datasetid (use SOPInstanceUID to guarantee uniqueness per instance)
             if((ds.get('Modality') != 'SR') and (ds.get('Modality') != 'SEG')):
                 print("Image Instance Found")
-                datasetId = f"{ds.get('SeriesInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
+                datasetId = f"{ds.get('SOPInstanceUID')}.1{ds.get('Rows')}{ds.get('Columns')}{ds.get('SeriesDate')}.1D000000S0D000000S0D000000S0D000000S1D000000S0D000000"
                 dataset_uids.append(datasetId)
-                
-                subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
-                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]                
-                
-            # we are assuming only one SR in the study, and it contains the manifest
-            elif ds.get('Modality') == 'SR':              
-        
-                # fetch manifest from api host's api
-                abpapi_url = f"{settings.ABPAPI_URL}/manifest/{study_instance_uid}"
-                # Send GET with query param
-                response = await apiClient.get(str(abpapi_url), params={"studyInstanceUID": study_instance_uid})
-                response.raise_for_status()
 
-                # Convert to JSON/dict
-                viewer_session = ViewerSession(**response.json())
-                is_manifest_from_sr = True
+                subject_filename = f"{ds.get('PatientID')}-{ds.get('StudyDate')}-{ds.get('InstanceNumber')}.dcm"
+                subject_files[subject_filename] = [ds.get('SOPInstanceUID'), ds.get('SeriesInstanceUID'), ds.get('StudyInstanceUID')]
 
         generated_datasets, generated_sources, generated_paths = generate_data_structure(dataset_uids, subject_files)
 
-        # if no SR found
-        if not viewer_session:
-            print("No SR found in the study. Creating empty viewer session.")
+        # if stored manifest found: update only the file paths in datasetFilePath.
+        # Keep datasets/dataSources intact — their IDs are ITK-wasm computed and must
+        # match the imageID values stored in rulers/labelMaps.
+        if viewer_session is not None:
+            # Build sopInstanceUID → generated path mapping
+            sop_to_path: Dict[str, str] = {}
+            for path in generated_paths.values():
+                filename = path.split('/')[-1]
+                sop_uid = subject_files[filename][0]
+                sop_to_path[sop_uid] = path
+
+            # Build dataSource lookup by id
+            datasource_map = {src.id: src for src in viewer_session.dataSources}
+
+            # For each stored dataset, find its SOPInstanceUID via prefix match,
+            # then walk dataset → collection → file dataSource to get fileId,
+            # and update the path in datasetFilePath
+            for dataset in viewer_session.datasets:
+                for sop_uid, path in sop_to_path.items():
+                    if dataset.id.startswith(sop_uid):
+                        collection_src = datasource_map.get(dataset.dataSourceId)
+                        if collection_src and collection_src.sources:
+                            file_src = datasource_map.get(collection_src.sources[0])
+                            if file_src and file_src.fileId is not None:
+                                viewer_session.datasetFilePath[str(file_src.fileId)] = path
+                        break
+
+            is_manifest_from_sr = True
+
+        # if no stored manifest found
+        if viewer_session is None:
+            print("No stored manifest found. Creating empty viewer session.")
             fake_layout = Layout(name="Axial Only", direction="H", items=["Axial"])
             fake_tools = Tools(
                 crosshairs={"position": (0, 0, 0)},

@@ -251,7 +251,11 @@ async def create_volview_zip_from_memory(
                     series_instance_uid=subject_files[filename][1],
                     sop_instance_uid=subject_files[filename][0],
                 )
-        
+
+                # Assign a unique SeriesInstanceUID per instance so VolView treats
+                # each file as its own series (avoids grouping 2D images into a volume)
+                subject_ds.SeriesInstanceUID = subject_files[filename][0]
+
                 with io.BytesIO() as dcm_buffer:
                     subject_ds.save_as(dcm_buffer, write_like_original=True)
                     zf.writestr(path, dcm_buffer.getvalue())

@@ -12,6 +12,7 @@ import {
 } from '../segmentGroups';
 
 const { VITE_FASTAPI_URL } = import.meta.env;
+const { VITE_FOUNDATION_API } = import.meta.env;
 
 const DENTAL_CLASS_MAP: Record<
   number,
@@ -66,13 +67,18 @@ function generateSegmentMetadata(parentImageID: string): SegmentGroupMetadata {
 async function fetchApiRulers(dicomData: DicomImageData) {
   const { studyInstanceUID, seriesInstanceUID, sopInstanceUID } = dicomData;
 
-  const response = await fetch(`${VITE_FASTAPI_URL}/get_segmentation`, {
+  // only axial view is supported in current API, so we capture the canvas as base64 image to send to API for segmentation
+  const canvas = document.querySelector('canvas');
+  const base64 = canvas?.toDataURL('image/png');
+
+  const response = await fetch(`${VITE_FOUNDATION_API}/get_segmentation`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       StudyInstanceUID: studyInstanceUID,
       SeriesInstanceUID: seriesInstanceUID,
       SopInstanceUID: sopInstanceUID,
+      Base64ImageString: base64
     }),
   });
 

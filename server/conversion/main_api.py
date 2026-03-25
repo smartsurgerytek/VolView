@@ -92,6 +92,10 @@ async def startup_event():
 async def shutdown_event():
     await app.state.http_client.aclose()
 
+@app.get("/api/health")
+async def health_check():
+    return JSONResponse(content={'status': 'healthy'}, status_code=200)
+
 @app.post("/api/save")  
 async def save_session_to_sr_and_seg(request: Request):
     try:

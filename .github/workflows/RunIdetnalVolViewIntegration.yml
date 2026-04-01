@@ -120,7 +120,7 @@ env:
 
   # Build Arguments for VolView Frontend
   # VV_DICOMWEB_URL: http://idental-int.getsmartsurgery.net:30080/dicom-web
-  VV_DICOMWEB_URL: https://idental-int.getsmartsurgery.net:30173/dicom-web
+  VV_DICOMWEB_URL: https://idental-int.getsmartsurgery.net:30367/dicom-web
   VV_FOUNDATION_API: https://idental-int.getsmartsurgery.net:30367/api/volview
   VV_FASTAPI_URL: https://idental-int.getsmartsurgery.net:30173/api
   VV_FOUNDATION_WEB: https://idental-int.getsmartsurgery.net:30398

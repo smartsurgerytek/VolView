@@ -522,7 +522,7 @@ async def get_segmentation(request: Request):
     try:
         print("Received /api/get_segmentation request")
 
-        print(f"Environment Type: {env_type}")
+        
 
         study_instance_uid = (await request.json()).get('StudyInstanceUID')
         series_instance_uid = (await request.json()).get('SeriesInstanceUID')

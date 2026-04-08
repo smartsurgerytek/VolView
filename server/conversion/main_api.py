@@ -63,7 +63,7 @@ dicomweb_url = settings.DICOMWEB_URL
 # Locally, it will default to 'development'
 
 
-print(f"Environment Type: {env_type}")
+
 client = DICOMwebClient(
 url=dicomweb_url
 )

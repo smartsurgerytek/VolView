@@ -63,26 +63,32 @@ dicomweb_url = settings.DICOMWEB_URL
 # Locally, it will default to 'development'
 
 
-env_type = os.getenv("ENV_TYPE", "development")
 print(f"Environment Type: {env_type}")
-if env_type == "development":
-    client = DICOMwebClient(
-        url=dicomweb_url
-    )
-else:
-    # Integration/Production: No defaults, force system to use real secrets
-    orthanc_user = os.getenv("ORTHANC_USERNAME")
-    orthanc_pass = os.getenv("ORTHANC_PASSWORD")
+client = DICOMwebClient(
+url=dicomweb_url
+)
+
+
+# env_type = os.getenv("ENV_TYPE", "development")
+# print(f"Environment Type: {env_type}")
+# if env_type == "development":
+#     client = DICOMwebClient(
+#         url=dicomweb_url
+#     )
+# else:
+#     # Integration/Production: No defaults, force system to use real secrets
+#     orthanc_user = os.getenv("ORTHANC_USERNAME")
+#     orthanc_pass = os.getenv("ORTHANC_PASSWORD")
     
-    if not orthanc_user or not orthanc_pass:
-        raise ValueError("ORTHANC_USERNAME and ORTHANC_PASSWORD must be set in the environment for production/integration environments.")
+#     if not orthanc_user or not orthanc_pass:
+#         raise ValueError("ORTHANC_USERNAME and ORTHANC_PASSWORD must be set in the environment for production/integration environments.")
     
-    session = requests.Session()
-    session.auth = (orthanc_user, orthanc_pass)
-    client = DICOMwebClient(
-        url=dicomweb_url,
-        session=session
-    )
+#     session = requests.Session()
+#     session.auth = (orthanc_user, orthanc_pass)
+#     client = DICOMwebClient(
+#         url=dicomweb_url,
+#         session=session
+#     )
 
 app = FastAPI()
 
@@ -534,7 +540,7 @@ async def get_segmentation(request: Request):
             raise ValueError("SopInstanceUID is required in the request body")
 
 
-        print("========================================Get Dicom Instance start===================================================")
+        print("===========================he=============Get Dicom Instance start===================================================")
 
 
         # Get Dicom Instance

@@ -61,26 +61,28 @@ dicomweb_url = settings.DICOMWEB_URL
 
 # Set this to 'integration' in your Cloud Run settings
 # Locally, it will default to 'development'
-env_type = os.getenv("ENV_TYPE", "development")
-print(f"Environment Type: {env_type}")
-if env_type == "development":
-    client = DICOMwebClient(
-        url=dicomweb_url
-    )
-else:
-    # Integration/Production: No defaults, force system to use real secrets
-    orthanc_user = os.getenv("ORTHANC_USERNAME")
-    orthanc_pass = os.getenv("ORTHANC_PASSWORD")
+
+
+# env_type = os.getenv("ENV_TYPE", "development")
+# print(f"Environment Type: {env_type}")
+# if env_type == "development":
+#     client = DICOMwebClient(
+#         url=dicomweb_url
+#     )
+# else:
+#     # Integration/Production: No defaults, force system to use real secrets
+#     orthanc_user = os.getenv("ORTHANC_USERNAME")
+#     orthanc_pass = os.getenv("ORTHANC_PASSWORD")
     
-    if not orthanc_user or not orthanc_pass:
-        raise ValueError("ORTHANC_USERNAME and ORTHANC_PASSWORD must be set in the environment for production/integration environments.")
+#     if not orthanc_user or not orthanc_pass:
+#         raise ValueError("ORTHANC_USERNAME and ORTHANC_PASSWORD must be set in the environment for production/integration environments.")
     
-    session = requests.Session()
-    session.auth = (orthanc_user, orthanc_pass)
-    client = DICOMwebClient(
-        url=dicomweb_url,
-        session=session
-    )
+#     session = requests.Session()
+#     session.auth = (orthanc_user, orthanc_pass)
+#     client = DICOMwebClient(
+#         url=dicomweb_url,
+#         session=session
+#     )
 
 app = FastAPI()
 
@@ -518,6 +520,8 @@ async def get_segmentation(request: Request):
         series_instance_uid = (await request.json()).get('SeriesInstanceUID')
         sop_instance_uid = (await request.json()).get('SopInstanceUID')
 
+
+
         if not study_instance_uid :
             raise ValueError("StudyInstanceUID is required in the request body")
 
@@ -527,6 +531,10 @@ async def get_segmentation(request: Request):
         if not sop_instance_uid:
             raise ValueError("SopInstanceUID is required in the request body")
 
+
+        print("========================================Get Dicom Instance start===================================================")
+
+
         # Get Dicom Instance
         instance = client.retrieve_instance(
                 study_instance_uid=study_instance_uid,
@@ -534,9 +542,11 @@ async def get_segmentation(request: Request):
                 sop_instance_uid=sop_instance_uid,
             )
 
+        print("========================================Get Image base64 String===================================================")
         # Get Image base64 String
         instance_base64 = get_base64_string(instance)
 
+        print("========================================invoke dentistry api===================================================")
         # invoke dentistry api
         segmentation_response = await get_dentistry_segmentation(instance_base64)
 
@@ -550,6 +560,8 @@ async def get_segmentation(request: Request):
         # print(f"--- debug_segmentation_response_output已儲存到 {debug_filename} 供除錯 ---")
         # #####
 
+
+        print("========================================get_vti_file===================================================")
         vti_content_bytes = get_vti_file(instance,segmentation_response)
 
         return Response(
@@ -563,6 +575,8 @@ async def get_segmentation(request: Request):
     except Exception as e:
         print(f"Error getting segmentation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+print("========================================get_base64_string===================================================")
 
 def get_base64_string(ds):
     new_image = ds.pixel_array.astype(float)
@@ -581,6 +595,8 @@ def get_base64_string(ds):
     base64_string = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return base64_string
 
+    print("========================================get_dentistry_segmentation===================================================")
+
 async def get_dentistry_segmentation(base64_string: str):
 
     url = "https://api-int.smartsurgerytek.net/v1/pa_segmentation_cvat"
@@ -594,6 +610,8 @@ async def get_dentistry_segmentation(base64_string: str):
 
     timeout_config = httpx.Timeout(30.0, connect=5.0)
 
+    print("========================================invoke Inference API===================================================")
+
     async with httpx.AsyncClient(timeout=timeout_config) as client:
         try:
             print(f"--- ready to invoke Inference API: {url} ---")
@@ -603,6 +621,8 @@ async def get_dentistry_segmentation(base64_string: str):
                 json=payload,
                 params=query_params
             )
+
+            print("========================================response===================================================")
 
             response.raise_for_status()
 

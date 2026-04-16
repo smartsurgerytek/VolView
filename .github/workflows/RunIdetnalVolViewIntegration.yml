@@ -1,117 +1,11 @@
-# name: Deploy Idental Services (Cloud Run - Integration)
-
-# on:
-#   workflow_dispatch:
-
-# env:
-#   PROJECT_ID: direct-hope-479409-c5
-#   REGION: asia-east1
-#   SERVICE_ACCOUNT: sa-for-idental-deployer@direct-hope-479409-c5.iam.gserviceaccount.com
-#   VPC_CONNECTOR: vpc-connector-int
-
-#   # Docker images  
-#   DOCKER_IMAGE_VOLVIEW_FRONTEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-frontend
-#   DOCKER_IMAGE_VOLVIEW_BACKEND: asia-east1-docker.pkg.dev/direct-hope-479409-c5/volview-repo/volview-backend
-
-#   # Build Arguments for VolView Frontend 
-#   VV_FOUNDATION_API: https://dicom-api-int.smartsurgerytek.net/api/volview
-#   VV_FASTAPI_URL: https://dicom-viewer-api-int.smartsurgerytek.net/api
-#   VV_DICOMWEB_URL: https://dicom-api-int.smartsurgerytek.net/dicom-web  
-#   VV_FOUNDATION_WEB: https://dicom-app-int.smartsurgerytek.net
-
-# jobs:
-#   build-and-deploy:
-#     name: Build & Deploy Volview (Integration)
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout code 
-#         uses: actions/checkout@v3
-
-#       - name: Authenticate with Google Cloud
-#         uses: google-github-actions/auth@v2
-#         with:
-#           credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
-#       - name: Set up gcloud CLI
-#         uses: google-github-actions/setup-gcloud@v2
-#         with:
-#           project_id: ${{ env.PROJECT_ID }}
-
-#       - name: Docker auth for Artifact Registry
-#         run: gcloud auth configure-docker asia-east1-docker.pkg.dev --quiet
-              
-#       - name: Free up disk space
-#         run: |
-#           docker system prune -af || true
-#           sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
-
-#       # 5. VolView Frontend Build, Push & Deploy
-#       - name: Build and Push VolView Frontend
-#         run: |
-#           docker build \
-#             --target frontend \
-#             --no-cache \
-#             --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
-#             --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
-#             --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
-#             --build-arg FOUNDATION_WEB=${{ env.VV_FOUNDATION_WEB }} \
-#             -f Dockerfile.Integration \
-#             -t ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest .
-          
-#           docker push ${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest
-
-#       - name: Deploy VolView Frontend to Cloud Run
-#         run: |
-#           gcloud run deploy volview-frontend-int \
-#             --image=${{ env.DOCKER_IMAGE_VOLVIEW_FRONTEND }}:latest \
-#             --platform=managed \
-#             --region=${{ env.REGION }} \
-#             --allow-unauthenticated \
-#             --service-account=${{ env.SERVICE_ACCOUNT }} \
-#             --port=80 \
-#             --memory=1Gi \
-#             --cpu=1
-
-#       # 6. VolView Backend Build, Push & Deploy
-#       - name: Build and Push VolView Backend
-#         run: |
-#           docker build \
-#             --target backend \
-#             --no-cache \
-#             -f Dockerfile.Integration \
-#             -t ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest .
-          
-#           docker push ${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest
-
-#       - name: Deploy VolView Backend to Cloud Run
-#         run: |
-#           gcloud run deploy volview-backend-int \
-#             --image=${{ env.DOCKER_IMAGE_VOLVIEW_BACKEND }}:latest \
-#             --platform=managed \
-#             --region=${{ env.REGION }} \
-#             --allow-unauthenticated \
-#             --service-account=${{ env.SERVICE_ACCOUNT }} \
-#             --vpc-connector=${{ env.VPC_CONNECTOR }} \
-#             --set-env-vars="PYTHON_ENV=Integration,ORTHANC_USERNAME=admin,ORTHANC_PASSWORD=${{ secrets.ORTHANC_PASSWORD }},DIRECT_ORTHANC_URL=https://dicom-pacs-int.smartsurgerytek.net" \
-#             --port=4014 \
-#             --memory=1Gi \
-#             --cpu=1
-
-
-
-
-#======= aws workflow start
-
-
-name: CI/CD - Build & Deploy VolView (Integration)
+name: Deploy VolView INT k3s
 
 on:
   workflow_dispatch:
 
 env:
-  ECR_REGISTRY: 587128718062.dkr.ecr.ap-south-1.amazonaws.com
-  ECR_REPO: 587128718062.dkr.ecr.ap-south-1.amazonaws.com/idental
+  ECR_REGISTRY: 587128718062.dkr.ecr.ap-east-2.amazonaws.com
+  ECR_REPO: 587128718062.dkr.ecr.ap-east-2.amazonaws.com/volview-int
   VM_USER: ubuntu
   K8S_NAMESPACE: foundation
 
@@ -122,9 +16,6 @@ env:
   VV_FOUNDATION_WEB: https://idental-int.getsmartsurgery.net:30398
 
 jobs:
-  # ──────────────────────────────────────────
-  # JOB 1: BUILD & PUSH - VolView Frontend
-  # ──────────────────────────────────────────
   build-volview-frontend:
     name: Build & Push VolView Frontend
     runs-on: ubuntu-latest
@@ -142,7 +33,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ap-east-2
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -159,15 +50,10 @@ jobs:
             --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
             --build-arg FOUNDATION_WEB=${{ env.VV_FOUNDATION_WEB }} \
             -f Dockerfile.Integration \
-            -t ${{ env.ECR_REPO }}:volview-frontend-${{ github.sha }} \
             -t ${{ env.ECR_REPO }}:volview-frontend-latest \
             .
-          docker push ${{ env.ECR_REPO }}:volview-frontend-${{ github.sha }}
           docker push ${{ env.ECR_REPO }}:volview-frontend-latest
 
-  # ──────────────────────────────────────────
-  # JOB 2: BUILD & PUSH - VolView Backend
-  # ──────────────────────────────────────────
   build-volview-backend:
     name: Build & Push VolView Backend
     runs-on: ubuntu-latest
@@ -185,7 +71,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ap-east-2
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -198,15 +84,10 @@ jobs:
             --target backend \
             --no-cache \
             -f Dockerfile.Integration \
-            -t ${{ env.ECR_REPO }}:volview-backend-${{ github.sha }} \
             -t ${{ env.ECR_REPO }}:volview-backend-latest \
             .
-          docker push ${{ env.ECR_REPO }}:volview-backend-${{ github.sha }}
           docker push ${{ env.ECR_REPO }}:volview-backend-latest
 
-  # ──────────────────────────────────────────
-  # JOB 3: DEPLOY to INT k3s VM
-  # ──────────────────────────────────────────
   deploy:
     name: Deploy to INT k3s VM
     runs-on: ubuntu-latest
@@ -215,221 +96,38 @@ jobs:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 13.232.131.104
+          host: 54.55.128.204
           username: ubuntu
-          key: ${{ secrets.VM_SSH_KEY }}
+          key: ${{ secrets.INT_EC2_SSH_KEY }}
           command_timeout: 30m
           script: |
             set -e
-            export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+            export KUBECONFIG=/home/ubuntu/.kube/config
 
-            ECR_REPO="587128718062.dkr.ecr.ap-south-1.amazonaws.com/idental"
-            SHA="${{ github.sha }}"
+            ECR_REPO="587128718062.dkr.ecr.ap-east-2.amazonaws.com/volview-int"
             NS="foundation"
 
             echo "=== Refresh ECR pull secret ==="
-            ECR_PASSWORD=$(aws ecr get-login-password --region ap-south-1)
+            ECR_PASSWORD=$(aws ecr get-login-password --region ap-east-2)
             kubectl create secret docker-registry ecr-registry-secret \
-              --docker-server=587128718062.dkr.ecr.ap-south-1.amazonaws.com \
+              --docker-server=587128718062.dkr.ecr.ap-east-2.amazonaws.com \
               --docker-username=AWS \
               --docker-password=$ECR_PASSWORD \
               -n $NS \
               --dry-run=client -o yaml | kubectl apply -f -
 
-            echo "=== Update k3s deployments with new images ==="
-            kubectl set image deployment/volview-frontend \
-              volview-frontend=$ECR_REPO:volview-frontend-$SHA -n $NS
-            kubectl set image deployment/volview-backend \
-              volview-backend=$ECR_REPO:volview-backend-$SHA -n $NS
-
-            echo "=== imagePullPolicy Always ==="
-            kubectl patch deployment volview-frontend -n $NS \
-              --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Always"}]'
-            kubectl patch deployment volview-backend -n $NS \
-              --type=json -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Always"}]'
+            echo "=== Apply viewer manifests ==="
+            cd ~/sst/dentistry-foundation-dicom
+            git pull origin aws_migration_dapr
+            kubectl apply -f etc/k3sInt/07-viewers.yaml
 
             echo "=== Rollout restart ==="
             kubectl rollout restart deployment/volview-frontend -n $NS
             kubectl rollout restart deployment/volview-backend -n $NS
 
             echo "=== Wait for rollouts ==="
-            kubectl rollout status deployment/volview-frontend -n $NS --timeout=300s || true
-            kubectl rollout status deployment/volview-backend -n $NS --timeout=300s || true
+            kubectl rollout status deployment/volview-frontend -n $NS --timeout=300s
+            kubectl rollout status deployment/volview-backend -n $NS --timeout=300s
 
             echo "=== Done! ==="
             kubectl get pods -n $NS | grep volview
-
-
-
-##===================== start aws stg ==================================
-
-
-# name: CI/CD - Build & Deploy VolView (Staging)
-
-# on:
-#   workflow_dispatch:
-
-# env:
-#   ECR_REGISTRY: 587128718062.dkr.ecr.ap-east-2.amazonaws.com
-#   ECR_REPO: 587128718062.dkr.ecr.ap-east-2.amazonaws.com/idental-stg
-#   VM_USER: ubuntu
-#   K8S_NAMESPACE: foundation
-
-#   # Build Arguments for VolView Frontend
-#   VV_DICOMWEB_URL: https://idental-stg.getsmartsurgery.net:30367/dicom-web
-#   VV_FOUNDATION_API: https://idental-stg.getsmartsurgery.net:30367/api/volview
-#   VV_FASTAPI_URL: https://idental-stg.getsmartsurgery.net:30173/api
-#   VV_FOUNDATION_WEB: https://idental-stg.getsmartsurgery.net:30398
-
-# jobs:
-#   # ──────────────────────────────────────────
-#   # JOB 1: BUILD & PUSH - VolView Frontend
-#   # ──────────────────────────────────────────
-#   build-volview-frontend:
-#     name: Build & Push VolView Frontend
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Free up disk space
-#         run: |
-#           docker system prune -af || true
-#           sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
-
-#       - name: Configure AWS Credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: ap-east-2
-
-#       - name: Login to ECR
-#         uses: aws-actions/amazon-ecr-login@v2
-#         with:
-#           registries: 587128718062
-
-#       - name: Build & Push VolView Frontend
-#         run: |
-#           docker build \
-#             --target frontend \
-#             --no-cache \
-#             --build-arg DICOMWEB_URL=${{ env.VV_DICOMWEB_URL }} \
-#             --build-arg FOUNDATION_API=${{ env.VV_FOUNDATION_API }} \
-#             --build-arg FASTAPI_URL=${{ env.VV_FASTAPI_URL }} \
-#             --build-arg FOUNDATION_WEB=${{ env.VV_FOUNDATION_WEB }} \
-#             -f Dockerfile.Integration \
-#             -t ${{ env.ECR_REPO }}:volview-frontend-${{ github.sha }} \
-#             -t ${{ env.ECR_REPO }}:volview-frontend-latest \
-#             .
-#           docker push ${{ env.ECR_REPO }}:volview-frontend-${{ github.sha }}
-#           docker push ${{ env.ECR_REPO }}:volview-frontend-latest
-
-#   # ──────────────────────────────────────────
-#   # JOB 2: BUILD & PUSH - VolView Backend
-#   # ──────────────────────────────────────────
-#   build-volview-backend:
-#     name: Build & Push VolView Backend
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-
-#       - name: Free up disk space
-#         run: |
-#           docker system prune -af || true
-#           sudo rm -rf /usr/share/dotnet /opt/hostedtoolcache || true
-
-#       - name: Configure AWS Credentials
-#         uses: aws-actions/configure-aws-credentials@v4
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: ap-east-2
-
-#       - name: Login to ECR
-#         uses: aws-actions/amazon-ecr-login@v2
-#         with:
-#           registries: 587128718062
-
-#       - name: Build & Push VolView Backend
-#         run: |
-#           docker build \
-#             --target backend \
-#             --no-cache \
-#             -f Dockerfile.Integration \
-#             -t ${{ env.ECR_REPO }}:volview-backend-${{ github.sha }} \
-#             -t ${{ env.ECR_REPO }}:volview-backend-latest \
-#             .
-#           docker push ${{ env.ECR_REPO }}:volview-backend-${{ github.sha }}
-#           docker push ${{ env.ECR_REPO }}:volview-backend-latest
-
-#   # ──────────────────────────────────────────
-#   # JOB 3: DEPLOY to STG k3s VM
-#   # ──────────────────────────────────────────
-#   deploy:
-#     name: Deploy to STG k3s VM
-#     runs-on: ubuntu-latest
-#     needs: [build-volview-frontend, build-volview-backend]
-#     steps:
-#       - name: SSH & Deploy
-#         uses: appleboy/ssh-action@v1.0.3
-#         with:
-#           host: 43.213.229.119
-#           username: ubuntu
-#           key: ${{ secrets.STG_EC2_SSH_KEY }}
-#           command_timeout: 30m
-#           script: |
-#             set -e
-#             export KUBECONFIG=/home/ubuntu/.kube/config
-
-#             ECR_REPO="587128718062.dkr.ecr.ap-east-2.amazonaws.com/idental-stg"
-#             SHA="${{ github.sha }}"
-#             NS="foundation"
-
-#             echo "=== Refresh ECR pull secret ==="
-#             ECR_PASSWORD=$(aws ecr get-login-password --region ap-east-2)
-#             kubectl create secret docker-registry ecr-registry-secret \
-#               --docker-server=587128718062.dkr.ecr.ap-east-2.amazonaws.com \
-#               --docker-username=AWS \
-#               --docker-password=$ECR_PASSWORD \
-#               -n $NS \
-#               --dry-run=client -o yaml | kubectl apply -f -
-
-#             echo "=== Update k3s deployments with new images ==="
-#             kubectl set image deployment/volview-frontend \
-#               volview-frontend=$ECR_REPO:volview-frontend-$SHA -n $NS
-#             kubectl set image deployment/volview-backend \
-#               volview-backend=$ECR_REPO:volview-backend-$SHA -n $NS
-
-#             echo "=== Rollout restart ==="
-#             kubectl rollout restart deployment/volview-frontend -n $NS
-#             kubectl rollout restart deployment/volview-backend -n $NS
-
-#             echo "=== Wait for rollouts ==="
-#             kubectl rollout status deployment/volview-frontend -n $NS --timeout=300s || true
-#             kubectl rollout status deployment/volview-backend -n $NS --timeout=300s || true
-
-#             echo "=== Done! ==="
-#             kubectl get pods -n $NS | grep volview
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
